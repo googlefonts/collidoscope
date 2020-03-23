@@ -29,10 +29,6 @@ This tests for non-adjacent glyphs and collisions not involving cursive connecti
 
     python3 collidoscope -c 5 -cursive yourfont.otf > report.html
 
-This tests for non-adjacent glyphs and collisions not involving cursive connection for *all combinations of glyphs in your font* with a five-character string. This may take a number of years to compute...
-
-    python3 collidoscope -area 20 -c 2 -r 0600-0700  > report.html
-
 This just runs an area test for two-character sequences across the basic Arabic range.
 
 ## Requirements
