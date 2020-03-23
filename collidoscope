@@ -152,8 +152,10 @@ def get_glyphs(hbfont, font, text, anchors):
     ix = 0
     for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
         position = Point(cursor + pos.position[0], pos.position[1])
+
         name = glyf.getGlyphName(info.codepoint)
         g = get_positioned_glyph(name, position)
+        g["advance"] = pos.position[2]
         for p in g["paths"]:
             p.origin = info.cluster
             p.glyphIndex = ix
@@ -181,10 +183,14 @@ def draw_overlaps(glyphs, overlaps, filename):
 def has_collisions(glyphs, counter, rules):
     # Rules for collision detection:
     #   "Far away" (adjacency > 1) glyphs should not interact at all
-    # However, marks must be ignored in adjacency computation
     if rules["faraway"]:
         for firstIx, first in enumerate(glyphs):
-            for secondIx in range(firstIx+2,len(glyphs)):
+            nonAdjacent = firstIx+2
+            while nonAdjacent < len(glyphs):
+                if glyphs[nonAdjacent]["advance"] == 0:
+                    nonAdjacent = nonAdjacent+1
+                else: break
+            for secondIx in range(nonAdjacent,len(glyphs)):
                 second = glyphs[secondIx]
                 overlaps = find_overlapping_paths(first, second)
                 if not overlaps: continue
