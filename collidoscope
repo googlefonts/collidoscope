@@ -77,16 +77,21 @@ glyphcache = {}
 def get_cached_glyph(name):
     if name in glyphcache: return glyphcache[name]
     paths = BezierPath.fromFonttoolsGlyph(font, name)
+    pathbounds = []
+    paths = list(filter(lambda p: p.area > 0, paths))
     for p in paths:
         p.hasAnchor = False
         p.glyphname = name
         if name in anchors:
             for a in anchors[name]:
                 if p.pointIsInside(Point(*a)): p.hasAnchor = True
-    pathbounds = [ p.bounds() for p in paths ]
+        bounds = p.bounds()
+        pathbounds.append(bounds)
+
     glyphbounds = BoundingBox()
     if pathbounds:
-        for p in pathbounds: glyphbounds.extend(p)
+        for p in pathbounds:
+            glyphbounds.extend(p)
     else:
         glyphbounds.tr = Point(0,0)
         glyphbounds.bl = Point(0,0)
@@ -97,6 +102,7 @@ def get_cached_glyph(name):
         "glyphbounds": glyphbounds,
         "pathconvexhull": None # XXX
     }
+    assert(len(glyphcache[name]["pathbounds"]) == len(glyphcache[name]["paths"]))
     return glyphcache[name]
 
 def get_positioned_glyph(name, pos):
@@ -107,6 +113,7 @@ def get_positioned_glyph(name, pos):
         "pathbounds": [b.translated(pos) for b in g["pathbounds"]],
         "glyphbounds": g["glyphbounds"].translated(pos),
     }
+    assert(len(positioned["pathbounds"]) == len(positioned["paths"]))
     # Copy path info
     for old,new in zip(g["paths"], positioned["paths"]):
         new.hasAnchor = old.hasAnchor
