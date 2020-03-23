@@ -171,7 +171,7 @@ def draw_overlaps(glyphs, overlaps, filename):
         for ix, g in enumerate(glyphs):
             col = "bgrcmy"
             for p in g["paths"]:
-                p.clone().plot(ax, drawNodes = False, color=col[ix], fill = p.hasAnchor)
+                p.clone().plot(ax, drawNodes = False, color=col[ix % len(col)], fill = p.hasAnchor)
             # for p in g["pathbounds"]:
                 # bb2path(p).plot(ax, fill= False, drawNodes = False, color=col[ix])
 
@@ -200,7 +200,7 @@ def has_collisions(glyphs, counter, rules):
     #   Where there anchors between a glyph pair, the anchored paths should be
     #   allowed to collide but others should not
     # XX this rule does not work when cursive attachment is used occasionally
-    for firstIx in range(0,len(glyphs)):
+    for firstIx in range(0,len(glyphs)-1):
         first = glyphs[firstIx]
         firstHasAnchors = any([x.hasAnchor for x in first["paths"]])
         second = glyphs[firstIx+1]
@@ -212,7 +212,7 @@ def has_collisions(glyphs, counter, rules):
                 if not overlaps: continue
                 draw_overlaps(glyphs, overlaps, 'col-%06i.png' % counter)
                 return True
-        if rules["area"]:
+        if rules["area"] > 0:
             overlaps = find_overlapping_paths(first, second)
             if not overlaps: continue
             newoverlaps = []
