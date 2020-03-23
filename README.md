@@ -34,3 +34,12 @@ This tests for non-adjacent glyphs and collisions not involving cursive connecti
     python3 collidoscope -area 20 -c 2 -r 0600-0700  > report.html
 
 This just runs an area test for two-character sequences across the basic Arabic range.
+
+## Requirements
+
+This requires some Python modules to be installed. You can install them like so:
+
+    pip3 install beziers>=0.0.3
+    pip3 install uharfbuzz
+    pip3 install fonttools
+    pip3 install matplotlib
