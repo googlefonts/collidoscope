@@ -133,16 +133,16 @@ def find_overlapping_paths(g1, g2):
 
     if not overlappingPathBounds: return []
 
-    overlappingPaths = []
+    overlappingPaths = {}
     for ix1, ix2 in overlappingPathBounds:
         p1 = g1["paths"][ix1]
         p2 = g2["paths"][ix2]
         for s1 in p1.asSegments():
           for s2 in p2.asSegments():
             if len(s1.intersections(s2))>0:
-                overlappingPaths.append((p1,p2))
+                overlappingPaths[(p1,p2)] = 1
 
-    return overlappingPaths
+    return list(overlappingPaths.keys())
 
 def get_glyphs(hbfont, font, text, anchors):
     buf = shape_a_text(hbfont, text)
