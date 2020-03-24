@@ -15,19 +15,19 @@ Depending on the length of the string and the number of glyphs tested, this may 
 
 To use it:
 
-    python3 collidoscope -r 0620-064A yourfont.otf > report.html
+    python3 -m collidoscope -r 0620-064A yourfont.otf
 
 This creates a collision report on `report.html` for all sequences of three characters within the range 0x620 to 0x64A.
 
-    python3 collidoscope -r 0620-064A,0679-06D3 -area 10 yourfont.otf > report.html
+    python3 -m collidoscope -r 0620-064A,0679-06D3 -area 10 yourfont.otf
 
 This creates a collision report on `report.html` for all sequences of three characters within the range 0x620 to 0x64A and also 0x679 to 0x6D3, and turns on the area test at a tolerance of 10% of the area of the smallest path involved in collision.
 
-    python3 collidoscope -c 5 -cursive yourfont.otf > report.html
+    python3 -m collidoscope -c 5 -cursive yourfont.otf
 
 This tests for non-adjacent glyphs and collisions not involving cursive connection for *all combinations of glyphs in your font* with a five-character string. This may take a number of years to compute.
 
-    python3 collidoscope -c 5 -cursive yourfont.otf > report.html
+    python3 -m collidoscope -c 5 -cursive yourfont.otf
 
 This just runs an area test for two-character sequences across the basic Arabic range.
 
