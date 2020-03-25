@@ -61,7 +61,7 @@ class Collidoscope:
         if name in self.glyphcache: return self.glyphcache[name]
         paths = BezierPath.fromFonttoolsGlyph(self.font, name)
         pathbounds = []
-        paths = list(filter(lambda p: p.area > 0, paths))
+        paths = list(filter(lambda p: p.length > 0, paths))
         for p in paths:
             p.hasAnchor = False
             p.glyphname = name
