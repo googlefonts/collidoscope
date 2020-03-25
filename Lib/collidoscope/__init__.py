@@ -9,10 +9,6 @@ from beziers.boundingbox import BoundingBox
 import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
 class Collidoscope:
     def __init__(self, fontfilename, rules):
         self.fontfilename = fontfilename
@@ -147,22 +143,29 @@ class Collidoscope:
             cursor = cursor + pos.position[2]
         return glyphs
 
-    def draw_overlaps(self, glyphs, overlaps, filename):
-        fig, ax = plt.subplots()
+    def draw_overlaps(self, glyphs, overlaps, attribs=""):
+        svgpaths = []
+        bbox = glyphs[0]["glyphbounds"]
+        col = ["green", "red", "purple", "blue", "yellow"]
         for ix, g in enumerate(glyphs):
-            col = "bgrcmy"
+            bbox.extend(g["glyphbounds"])
             for p in g["paths"]:
-                p.clone().plot(ax, drawNodes = False, color=col[ix % len(col)], fill = p.hasAnchor)
-            # for p in g["pathbounds"]:
-                # bb2path(p).plot(ax, fill= False, drawNodes = False, color=col[ix])
+                svgpaths.append(
+                    "<path d=\"%s\" fill=\"%s\"/>" %
+                    (p.asSVGPath(), col[ix%len(col)])
+                )
         for p1,p2 in overlaps:
             intersect = p1.intersection(p2)
-            for i in intersect: i.clone().plot(ax, fill= True, drawNodes = False)
-        plt.axis('off')
-        plt.savefig(filename)
-        plt.close(fig)
+            for i in intersect:
+                svgpaths.append(
+                    "<path d=\"%s\" fill=\"black\"/>" %
+                    (i.asSVGPath())
+                )
+        return "<svg %s viewBox=\"%i %i %i %i\">%s</svg>\n" % (attribs,
+            bbox.left, bbox.bottom, bbox.width, bbox.height, "\n".join(svgpaths)
+        )
 
-    def has_collisions(self, glyphs, counter):
+    def has_collisions(self, glyphs, attribs=""):
         # Rules for collision detection:
         #   "Far away" (adjacency > 1) glyphs should not interact at all
         if self.rules["faraway"]:
@@ -176,8 +179,7 @@ class Collidoscope:
                     second = glyphs[secondIx]
                     overlaps = self.find_overlapping_paths(first, second)
                     if not overlaps: continue
-                    self.draw_overlaps(glyphs, overlaps, 'col-%06i.png' % counter)
-                    return True
+                    return self.draw_overlaps(glyphs, overlaps, attribs)
 
         #   Where there anchors between a glyph pair, the anchored paths should be
         #   allowed to collide but others should not
@@ -192,8 +194,7 @@ class Collidoscope:
                     overlaps = self.find_overlapping_paths(first, second)
                     overlaps = list(filter(lambda x: ((x[0].hasAnchor and not x[1].hasAnchor) or (x[1].hasAnchor and not x[0].hasAnchor)), overlaps))
                     if not overlaps: continue
-                    self.draw_overlaps(glyphs, overlaps, 'col-%06i.png' % counter)
-                    return True
+                    return self.draw_overlaps(glyphs, overlaps, attribs)
             if self.rules["area"] > 0:
                 overlaps = self.find_overlapping_paths(first, second)
                 if not overlaps: continue
@@ -203,10 +204,9 @@ class Collidoscope:
                     for i in intersect:
                         ia = i.area
                         # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
-                        if ia > p1.area * rules["area"] or ia > p2.area*rules["area"]:
+                        if ia > p1.area * self.rules["area"] or ia > p2.area*self.rules["area"]:
                             newoverlaps.append((p1,p2))
                 if newoverlaps:
-                    self.draw_overlaps(glyphs, newoverlaps, 'col-%06i.png' % counter)
-                    return True
+                    return self.draw_overlaps(glyphs, newoverlaps, attribs)
         return False
 

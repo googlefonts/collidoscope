@@ -64,7 +64,7 @@ grid-auto-rows: auto;
 grid-gap: 1rem;
 font-family:'%s'; font-size:50pt;
 }
- 
+        svg { transform: scaleY(-1); }
  
 .card {
 border: 2px solid #e7e7e7;
@@ -82,11 +82,12 @@ counter = 0
 for element in itertools.product(*combinations):
     c.prep_shaper()
     text = "".join(map(chr, element))
-    # if counter % 100 == 0:
-    sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, count, counter/count*100))
+    if counter % 100 == 0:
+        sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, count, counter/count*100))
     glyphs = c.get_glyphs(text)
-    if c.has_collisions(glyphs, counter):
-        report.write("<div class=\"card\"> %s <img src=\"col-%06i.png\" width=\"200\"></div> \n" % (text, counter))
+    cols = c.has_collisions(glyphs, "preserveAspectRatio=\"xMidYMax\" width=300 height=200")
+    if cols:
+        report.write("<div class=\"card\"> %s %s</div> \n" % (text, cols))
         report.flush()
     counter = counter + 1
 
