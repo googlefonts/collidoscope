@@ -10,14 +10,21 @@ import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 class Collidoscope:
-    def __init__(self, fontfilename, rules):
+    def __init__(self, fontfilename, rules, ttFont = None):
         self.fontfilename = fontfilename
         self.glyphcache = {}
-        self.fontbinary = Path(fontfilename).read_bytes()
-        self.font = TTFont(fontfilename)
+        if ttFont:
+            self.font = ttFont
+            self.fontbinary = ttFont.reader.file.read()
+        else:
+            self.fontbinary = Path(fontfilename).read_bytes()
+            self.font = TTFont(fontfilename)
         self.rules = rules
         self.prep_shaper()
-        self.get_anchors()
+        if self.rules["cursive"]:
+            self.get_anchors()
+        else:
+            self.anchors = {}
 
     def prep_shaper(self):
         face = hb.Face(self.fontbinary)
