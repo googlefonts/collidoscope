@@ -177,11 +177,12 @@ class Collidoscope:
         #   "Far away" (adjacency > 1) glyphs should not interact at all
         if self.rules["faraway"]:
             for firstIx, first in enumerate(glyphs):
-                nonAdjacent = firstIx+2
-                while nonAdjacent < len(glyphs):
-                    if glyphs[nonAdjacent]["advance"] == 0:
-                        nonAdjacent = nonAdjacent+1
-                    else: break
+                passedBases = 0
+                nonAdjacent = firstIx
+                while passedBases < 2 and nonAdjacent < len(glyphs):
+                    if glyphs[nonAdjacent]["advance"] > 2:
+                        passedBases = passedBases + 1
+                    nonAdjacent = nonAdjacent+1
                 for secondIx in range(nonAdjacent,len(glyphs)):
                     second = glyphs[secondIx]
                     overlaps = self.find_overlapping_paths(first, second)
