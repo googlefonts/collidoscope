@@ -85,8 +85,9 @@ for element in itertools.product(*combinations):
     if counter % 100 == 0:
         sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, count, counter/count*100))
     glyphs = c.get_glyphs(text)
-    cols = c.has_collisions(glyphs, "preserveAspectRatio=\"xMidYMax\" width=300 height=200")
+    cols = c.has_collisions(glyphs)
     if cols:
+        cols = c.draw_overlaps(glyphs, cols, "preserveAspectRatio=\"xMidYMax\" width=300 height=200")
         report.write("<div class=\"card\"> %s %s</div> \n" % (text, cols))
         report.flush()
     counter = counter + 1

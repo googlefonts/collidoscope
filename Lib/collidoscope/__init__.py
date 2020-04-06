@@ -172,7 +172,7 @@ class Collidoscope:
             bbox.left, bbox.bottom, bbox.width, bbox.height, "\n".join(svgpaths)
         )
 
-    def has_collisions(self, glyphs, attribs=""):
+    def has_collisions(self, glyphs):
         # Rules for collision detection:
         #   "Far away" (adjacency > 1) glyphs should not interact at all
         if self.rules["faraway"]:
@@ -186,8 +186,7 @@ class Collidoscope:
                 for secondIx in range(nonAdjacent,len(glyphs)):
                     second = glyphs[secondIx]
                     overlaps = self.find_overlapping_paths(first, second)
-                    if not overlaps: continue
-                    return self.draw_overlaps(glyphs, overlaps, attribs)
+                    if overlaps: return overlaps
 
         #   Where there anchors between a glyph pair, the anchored paths should be
         #   allowed to collide but others should not
@@ -202,7 +201,7 @@ class Collidoscope:
                     overlaps = self.find_overlapping_paths(first, second)
                     overlaps = list(filter(lambda x: ((x[0].hasAnchor and not x[1].hasAnchor) or (x[1].hasAnchor and not x[0].hasAnchor)), overlaps))
                     if not overlaps: continue
-                    return self.draw_overlaps(glyphs, overlaps, attribs)
+                    return overlaps
             if self.rules["area"] > 0:
                 overlaps = self.find_overlapping_paths(first, second)
                 if not overlaps: continue
@@ -215,6 +214,6 @@ class Collidoscope:
                         if ia > p1.area * self.rules["area"] or ia > p2.area*self.rules["area"]:
                             newoverlaps.append((p1,p2))
                 if newoverlaps:
-                    return self.draw_overlaps(glyphs, newoverlaps, attribs)
+                    return newoverlaps
         return False
 
