@@ -9,6 +9,8 @@ parser.add_argument('-c', type=int, default=3, dest="context",
                     help="number of glyphs to process", metavar="CONTEXT")
 parser.add_argument('--no-faraway', action='store_false', dest="faraway",
                     help="don't check for interactions between non-adjacent glyphs")
+parser.add_argument('--no-marks', action='store_false', dest="marks",
+                    help="don't check for interactions between marks")
 parser.add_argument('--cursive', action='store_true', dest="cursive",
                     help="check for interactions between paths without anchors")
 parser.add_argument('--area', type=int, default=0, dest="area",
@@ -26,7 +28,8 @@ fontfilename = args.input
 c = Collidoscope(fontfilename, {
         "faraway": args.faraway,
         "cursive": args.cursive,
-        "area":    args.area / 100
+        "area":    args.area / 100,
+        "marks":   args.marks
     })
 
 codepoints = c.font["cmap"].getBestCmap().keys()
@@ -82,7 +85,7 @@ counter = 0
 for element in itertools.product(*combinations):
     c.prep_shaper()
     text = "".join(map(chr, element))
-    if counter % 100 == 0:
+    if counter % 1 == 0:
         sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, count, counter/count*100))
     glyphs = c.get_glyphs(text)
     cols = c.has_collisions(glyphs)

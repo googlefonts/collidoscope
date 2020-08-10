@@ -6,11 +6,49 @@ from beziers.path import BezierPath
 from beziers.path.geometricshapes import Rectangle
 from beziers.point import Point
 from beziers.boundingbox import BoundingBox
+from glyphtools import categorize_glyph
 import sys
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from typing import NamedTuple
+
+class Collision(NamedTuple):
+    glyph1: str
+    glyph2: str
+    ix1: int
+    ix2: int
+    path1: BezierPath
+    path2: BezierPath
+    point: Point
+
 
 class Collidoscope:
-    def __init__(self, fontfilename, rules, ttFont = None):
+    """Detect collisions between font glyphs"""
+
+    def __init__(self, fontfilename, rules, direction="LTR", ttFont = None):
+        """Create a collision detector.
+
+        The rules dictionary may contain the following entries:
+            faraway (boolean): If true, non-adjacent base glyphs are tested for
+                overlap. Mark glyphs are ignored. All collisions are reported.
+            marks (boolean): If true, collisions between all pairs of marks in
+                the string are reported.
+            cursive (boolean): If true, adjacent glyphs are tested for overlap.
+                Paths containing cursive anchors are allowed to overlap, but
+                collisions between other paths are reported.
+            area (float): If provided, adjacent glyphs are tested for overlap.
+                Collisions are reported if the intersection area is greater than
+                the given proportion of the smallest path. (i.e. where cursive
+                connection anchors are not used in an Arabic font, you may wish
+                to ignore collisions if the overlaid area is less than 5% of the
+                smallest path, because this is likely to be the connection point
+                between the glyphs. But collisions affecting more than 5% of the
+                glyph will be reported.)
+
+        Args:
+            fontfilename: file name of font.
+            rules: dictionary of collision rules.
+            ttFont: fontTools object (loaded from file if not given).
+            direction: "LTR" or "RTL"
+        """
         self.fontfilename = fontfilename
         self.glyphcache = {}
         if ttFont:
@@ -21,7 +59,7 @@ class Collidoscope:
             self.font = TTFont(fontfilename)
         self.rules = rules
         self.prep_shaper()
-        if self.rules["cursive"]:
+        if "cursive" in self.rules and self.rules["cursive"]:
             self.get_anchors()
         else:
             self.anchors = {}
@@ -39,6 +77,7 @@ class Collidoscope:
         buf.add_str(text)
         buf.guess_segment_properties()
         hb.shape(self.hbfont, buf)
+        self.direction = buf.direction
         return buf
 
     def bb2path(bb):
@@ -86,6 +125,7 @@ class Collidoscope:
             "paths": paths,
             "pathbounds": pathbounds,
             "glyphbounds": glyphbounds,
+            "category": categorize_glyph(self.font, name)[0],
             "pathconvexhull": None # XXX
         }
         assert(len(self.glyphcache[name]["pathbounds"]) == len(self.glyphcache[name]["paths"]))
@@ -98,6 +138,7 @@ class Collidoscope:
             "paths": [ p.clone().translate(pos) for p in g["paths"] ],
             "pathbounds": [b.translated(pos) for b in g["pathbounds"]],
             "glyphbounds": g["glyphbounds"].translated(pos),
+            "category": g["category"]
         }
         assert(len(positioned["pathbounds"]) == len(positioned["paths"]))
         # Copy path info
@@ -106,7 +147,8 @@ class Collidoscope:
             new.glyphname = old.glyphname
         return positioned
 
-    def find_overlapping_paths(self, g1, g2):
+    def find_overlaps(self, g1, g2):
+        # print("Testing %s against %s" % (g1["name"], g2["name"]))
         if not (g1["glyphbounds"].overlaps(g2["glyphbounds"])): return []
         # print("Glyph bounds overlap")
 
@@ -114,7 +156,6 @@ class Collidoscope:
         for ix1,p1 in enumerate(g1["pathbounds"]):
             for ix2,p2 in enumerate(g2["pathbounds"]):
                 if p1.overlaps(p2):
-                    # print("Path bounds overlap ", ix1, ix2)
                     overlappingPathBounds.append( (ix1,ix2) )
 
         if not overlappingPathBounds: return []
@@ -125,12 +166,24 @@ class Collidoscope:
             p2 = g2["paths"][ix2]
             for s1 in p1.asSegments():
               for s2 in p2.asSegments():
-                if len(s1.intersections(s2))>0:
-                    overlappingPaths[(p1,p2)] = 1
-
-        return list(overlappingPaths.keys())
+                intersects = s1.intersections(s2)
+                if len(intersects)>0:
+                    overlappingPaths[(p1,p2)] = Collision(
+                        glyph1=g1["name"],
+                        glyph2=g2["name"],
+                        path1=p1,
+                        path2=p2,
+                        ix1=ix1,
+                        ix2=ix2,
+                        point=intersects[0].point
+                        )
+        return list(overlappingPaths.values())
 
     def get_glyphs(self, text):
+        """Returns an list of dictionaries representing a shaped string.
+
+        This is the first step in collision detection; the dictionaries
+        returned can be fed to ``draw_overlaps`` and ``has_collisions``."""
         buf = self.shape_a_text(text)
         glyf = self.font["glyf"]
         cursor = 0
@@ -150,7 +203,14 @@ class Collidoscope:
             cursor = cursor + pos.position[2]
         return glyphs
 
-    def draw_overlaps(self, glyphs, overlaps, attribs=""):
+    def draw_overlaps(self, glyphs, collisions, attribs=""):
+        """Return an SVG string displaying the collisions.
+
+        Args:
+            glyphs: A list of glyphs dictionaries.
+            collisions: A list of Collision objects.
+            attribs: String of attributes added to SVG header.
+        """
         svgpaths = []
         bbox = glyphs[0]["glyphbounds"]
         col = ["green", "red", "purple", "blue", "yellow"]
@@ -161,8 +221,8 @@ class Collidoscope:
                     "<path d=\"%s\" fill=\"%s\"/>" %
                     (p.asSVGPath(), col[ix%len(col)])
                 )
-        for p1,p2 in overlaps:
-            intersect = p1.intersection(p2)
+        for c in collisions:
+            intersect = c.path1.intersection(c.path2)
             for i in intersect:
                 svgpaths.append(
                     "<path d=\"%s\" fill=\"black\"/>" %
@@ -172,48 +232,82 @@ class Collidoscope:
             bbox.left, bbox.bottom, bbox.width, bbox.height, "\n".join(svgpaths)
         )
 
-    def has_collisions(self, glyphs):
+    def has_collisions(self, glyphs_in):
+        """Run the collision detection algorithm according to the rules provided.
+
+        Note that this does not find *all* overlaps, but returns as soon
+        as some collisions are found.
+
+        Args:
+            glyphs: A list of glyph dictionaries returned by ``get_glyphs``.
+
+        Returns: A list of Collision objects.
+        """
         # Rules for collision detection:
         #   "Far away" (adjacency > 1) glyphs should not interact at all
+        # print("Faraway test")
+        glyphs = glyphs_in
+        if self.direction == "rtl":
+            glyphs = list(reversed(glyphs))
         if self.rules["faraway"]:
             for firstIx, first in enumerate(glyphs):
                 passedBases = 0
-                nonAdjacent = firstIx
-                while passedBases < 2 and nonAdjacent < len(glyphs):
-                    if glyphs[nonAdjacent]["advance"] > 2:
-                        passedBases = passedBases + 1
-                    nonAdjacent = nonAdjacent+1
+                nonAdjacent = firstIx + 1
+                # print("Considering %i" % firstIx)
+                if first["category"] == "base":
+                    # Skip mark and next base
+                    while nonAdjacent<len(glyphs) and glyphs[nonAdjacent]["category"] == "mark":
+                        nonAdjacent = nonAdjacent + 1
+                    nonAdjacent = nonAdjacent + 1
+                if nonAdjacent >= len(glyphs):
+                    continue
+
                 for secondIx in range(nonAdjacent,len(glyphs)):
                     second = glyphs[secondIx]
-                    overlaps = self.find_overlapping_paths(first, second)
+                    # print("Faraway test %s %s" % (first["name"], second["name"]))
+                    overlaps = self.find_overlaps(first, second)
+                    if overlaps: return overlaps
+
+        if "marks" in self.rules:
+            # print("Mark testing")
+            for i in range(1,len(glyphs)-1):
+                if glyphs[i]["category"] != "mark":
+                    continue
+                for j in range(i+1, len(glyphs)):
+                    if glyphs[j]["category"] != "mark":
+                        continue
+                    overlaps = self.find_overlaps(glyphs[i], glyphs[j])
+                    # print(overlaps)
                     if overlaps: return overlaps
 
         #   Where there anchors between a glyph pair, the anchored paths should be
         #   allowed to collide but others should not
         # XX this rule does not work when cursive attachment is used occasionally
-        for firstIx in range(0,len(glyphs)-1):
-            first = glyphs[firstIx]
-            firstHasAnchors = any([x.hasAnchor for x in first["paths"]])
-            second = glyphs[firstIx+1]
-            if self.rules["cursive"]:
-                secondHasAnchors = any([x.hasAnchor for x in first["paths"]])
-                if firstHasAnchors or secondHasAnchors:
-                    overlaps = self.find_overlapping_paths(first, second)
-                    overlaps = list(filter(lambda x: ((x[0].hasAnchor and not x[1].hasAnchor) or (x[1].hasAnchor and not x[0].hasAnchor)), overlaps))
+        # print("Area and anchor test")
+        if "cursive" in self.rules or "area" in self.rules:
+            for firstIx in range(0,len(glyphs)-1):
+                first = glyphs[firstIx]
+                second = glyphs[firstIx+1]
+                if self.rules["cursive"]:
+                    firstHasAnchors = any([x.hasAnchor for x in first["paths"]])
+                    secondHasAnchors = any([x.hasAnchor for x in first["paths"]])
+                    if firstHasAnchors or secondHasAnchors:
+                        overlaps = self.find_overlaps(first, second)
+                        overlaps = list(filter(lambda x: ((x.path1.hasAnchor and not x.path2.hasAnchor) or (x.path2.hasAnchor and not x.path1.hasAnchor)), overlaps))
+                        if not overlaps: continue
+                        return overlaps
+                if self.rules["area"] > 0:
+                    overlaps = self.find_overlaps(first, second)
                     if not overlaps: continue
-                    return overlaps
-            if self.rules["area"] > 0:
-                overlaps = self.find_overlapping_paths(first, second)
-                if not overlaps: continue
-                newoverlaps = []
-                for p1,p2 in overlaps:
-                    intersect = p1.intersection(p2,flat=True)
-                    for i in intersect:
-                        ia = i.area
-                        # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
-                        if ia > p1.area * self.rules["area"] or ia > p2.area*self.rules["area"]:
-                            newoverlaps.append((p1,p2))
-                if newoverlaps:
-                    return newoverlaps
+                    newoverlaps = []
+                    for p1,p2 in overlaps:
+                        intersect = p1.intersection(p2,flat=True)
+                        for i in intersect:
+                            ia = i.area
+                            # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
+                            if ia > p1.area * self.rules["area"] or ia > p2.area*self.rules["area"]:
+                                newoverlaps.append((p1,p2))
+                    if newoverlaps:
+                        return newoverlaps
         return False
 
