@@ -13,6 +13,8 @@ This software tries every combination of glyphs within a specified Unicode range
 
 Depending on the length of the string and the number of glyphs tested, this may take a *very* long time.
 
+## Command Line Usage
+
 To use it:
 
     python3 -m collidoscope -r 0620-064A yourfont.otf
@@ -31,11 +33,96 @@ This tests for non-adjacent glyphs and collisions not involving cursive connecti
 
 This just runs an area test for two-character sequences across the basic Arabic range.
 
+## Library Usage
+
+```python
+class Collidoscope()
+```
+
+Detect collisions between font glyphs
+
+<a name="collidoscope.Collidoscope.__init__"></a>
+#### \_\_init\_\_
+
+```python
+ | __init__(fontfilename, rules, direction="LTR", ttFont=None)
+```
+
+Create a collision detector.
+
+The rules dictionary may contain the following entries:
+
+* faraway (boolean): If true, non-adjacent base glyphs are tested for
+overlap. Mark glyphs are ignored. All collisions are reported.
+marks (boolean): If true, collisions between all pairs of marks in
+the string are reported.
+* cursive (boolean): If true, adjacent glyphs are tested for overlap.
+Paths containing cursive anchors are allowed to overlap, but
+collisions between other paths are reported.
+* area (float): If provided, adjacent glyphs are tested for overlap.
+Collisions are reported if the intersection area is greater than
+the given proportion of the smallest path. (i.e. where cursive
+connection anchors are not used in an Arabic font, you may wish
+to ignore collisions if the overlaid area is less than 5% of the
+smallest path, because this is likely to be the connection point
+between the glyphs. But collisions affecting more than 5% of the
+glyph will be reported.)
+
+**Arguments**:
+
+- `fontfilename` - file name of font.
+- `rules` - dictionary of collision rules.
+- `ttFont` - fontTools object (loaded from file if not given).
+- `direction` - "LTR" or "RTL"
+
+<a name="collidoscope.Collidoscope.get_glyphs"></a>
+#### get\_glyphs
+
+```python
+ | get_glyphs(text)
+```
+
+Returns an list of dictionaries representing a shaped string.
+
+This is the first step in collision detection; the dictionaries
+returned can be fed to ``draw_overlaps`` and ``has_collisions``.
+
+<a name="collidoscope.Collidoscope.draw_overlaps"></a>
+#### draw\_overlaps
+
+```python
+ | draw_overlaps(glyphs, collisions, attribs="")
+```
+
+Return an SVG string displaying the collisions.
+
+**Arguments**:
+
+- `glyphs` - A list of glyphs dictionaries.
+- `collisions` - A list of Collision objects.
+- `attribs` - String of attributes added to SVG header.
+
+<a name="collidoscope.Collidoscope.has_collisions"></a>
+#### has\_collisions
+
+```python
+ | has_collisions(glyphs_in)
+```
+
+Run the collision detection algorithm according to the rules provided.
+
+Note that this does not find *all* overlaps, but returns as soon
+as some collisions are found.
+
+**Arguments**:
+
+- `glyphs` - A list of glyph dictionaries returned by ``get_glyphs``.
+  
+- `Returns` - A list of Collision objects.
+
+
 ## Requirements
 
 This requires some Python modules to be installed. You can install them like so:
 
-    pip3 install beziers>=0.0.3
-    pip3 install uharfbuzz
-    pip3 install fonttools
-    pip3 install matplotlib
+    pip3 install -r example-requirements.txt
