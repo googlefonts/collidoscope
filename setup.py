@@ -19,7 +19,7 @@ config = {
     'long_description': open('README.md', 'r').read(),
     'long_description_content_type': 'text/markdown',
     'license': 'MIT',
-    'version': '0.0.1',
+    'version': '0.0.3',
     'install_requires': install_requires,
     'classifiers': [
         "Programming Language :: Python",
@@ -29,8 +29,8 @@ config = {
         "Development Status :: 4 - Beta"
 
     ],
-    'package_dir': {'stringbrewer': 'stringbrewer'},
-    'packages': find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"])
+    'package_dir': {'':'Lib'},
+    'packages': ["collidoscope"]
 ,
 }
 

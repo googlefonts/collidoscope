@@ -300,13 +300,13 @@ class Collidoscope:
                     overlaps = self.find_overlaps(first, second)
                     if not overlaps: continue
                     newoverlaps = []
-                    for p1,p2 in overlaps:
-                        intersect = p1.intersection(p2,flat=True)
+                    for i1 in overlaps:
+                        intersect = i1.path1.intersection(i1.path2,flat=True)
                         for i in intersect:
                             ia = i.area
                             # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
-                            if ia > p1.area * self.rules["area"] or ia > p2.area*self.rules["area"]:
-                                newoverlaps.append((p1,p2))
+                            if ia > i1.path1.area * self.rules["area"] or ia > i1.path2.area*self.rules["area"]:
+                                newoverlaps.append(i)
                     if newoverlaps:
                         return newoverlaps
         return False
