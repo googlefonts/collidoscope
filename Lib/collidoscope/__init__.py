@@ -4,6 +4,7 @@ from pathlib import Path
 from fontTools.ttLib import TTFont
 from beziers.path import BezierPath
 from beziers.path.geometricshapes import Rectangle
+from beziers.utils.linesweep import bbox_intersections
 from beziers.point import Point
 from beziers.boundingbox import BoundingBox
 from glyphtools import categorize_glyph
@@ -13,8 +14,6 @@ from typing import NamedTuple
 class Collision(NamedTuple):
     glyph1: str
     glyph2: str
-    ix1: int
-    ix2: int
     path1: BezierPath
     path2: BezierPath
     point: Point
@@ -152,20 +151,16 @@ class Collidoscope:
         if not (g1["glyphbounds"].overlaps(g2["glyphbounds"])): return []
         # print("Glyph bounds overlap")
 
-        overlappingPathBounds = []
-        for ix1,p1 in enumerate(g1["pathbounds"]):
-            for ix2,p2 in enumerate(g2["pathbounds"]):
-                if p1.overlaps(p2):
-                    overlappingPathBounds.append( (ix1,ix2) )
+        overlappingPathBounds = bbox_intersections(g1["paths"], g2["paths"])
 
         if not overlappingPathBounds: return []
 
         overlappingPaths = {}
-        for ix1, ix2 in overlappingPathBounds:
-            p1 = g1["paths"][ix1]
-            p2 = g2["paths"][ix2]
-            for s1 in p1.asSegments():
-              for s2 in p2.asSegments():
+        for p1, p2 in overlappingPathBounds:
+            left_segs = p1.asSegments()
+            right_segs = p2.asSegments()
+            overlappingSegBounds = bbox_intersections(left_segs, right_segs)
+            for s1,s2 in overlappingSegBounds:
                 intersects = s1.intersections(s2)
                 if len(intersects)>0:
                     overlappingPaths[(p1,p2)] = Collision(
@@ -173,8 +168,6 @@ class Collidoscope:
                         glyph2=g2["name"],
                         path1=p1,
                         path2=p2,
-                        ix1=ix1,
-                        ix2=ix2,
                         point=intersects[0].point
                         )
         return list(overlappingPaths.values())
