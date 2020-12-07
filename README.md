@@ -54,7 +54,7 @@ The rules dictionary may contain the following entries:
 
 * faraway (boolean): If true, non-adjacent base glyphs are tested for
 overlap. Mark glyphs are ignored. All collisions are reported.
-marks (boolean): If true, collisions between all pairs of marks in
+* marks (boolean): If true, collisions between all pairs of marks in
 the string are reported.
 * cursive (boolean): If true, adjacent glyphs are tested for overlap.
 Paths containing cursive anchors are allowed to overlap, but
