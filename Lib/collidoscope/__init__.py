@@ -50,6 +50,7 @@ class Collidoscope:
         """
         self.fontfilename = fontfilename
         self.glyphcache = {}
+        self.direction = direction
         if ttFont:
             self.font = ttFont
             self.fontbinary = ttFont.reader.file.read()
@@ -172,12 +173,17 @@ class Collidoscope:
                         )
         return list(overlappingPaths.values())
 
-    def get_glyphs(self, text):
+    def get_glyphs(self, text, buf=None):
         """Returns an list of dictionaries representing a shaped string.
+
+        Args:
+            text: text to check
+            buf: (Optional) already shaped uharfbuzz buffer.
 
         This is the first step in collision detection; the dictionaries
         returned can be fed to ``draw_overlaps`` and ``has_collisions``."""
-        buf = self.shape_a_text(text)
+        if not buf:
+            buf = self.shape_a_text(text)
         glyf = self.font["glyf"]
         cursor = 0
         glyphs = []
@@ -281,7 +287,7 @@ class Collidoscope:
             for firstIx in range(0,len(glyphs)-1):
                 first = glyphs[firstIx]
                 second = glyphs[firstIx+1]
-                if self.rules["cursive"]:
+                if "cursive" in self.rules and self.rules["cursive"]:
                     firstHasAnchors = any([x.hasAnchor for x in first["paths"]])
                     secondHasAnchors = any([x.hasAnchor for x in first["paths"]])
                     if firstHasAnchors or secondHasAnchors:
@@ -289,7 +295,7 @@ class Collidoscope:
                         overlaps = list(filter(lambda x: ((x.path1.hasAnchor and not x.path2.hasAnchor) or (x.path2.hasAnchor and not x.path1.hasAnchor)), overlaps))
                         if not overlaps: continue
                         return overlaps
-                if self.rules["area"] > 0:
+                if "area" in self.rules and self.rules["area"] > 0:
                     overlaps = self.find_overlaps(first, second)
                     if not overlaps: continue
                     newoverlaps = []
