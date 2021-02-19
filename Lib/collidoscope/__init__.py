@@ -248,7 +248,7 @@ class Collidoscope:
         glyphs = glyphs_in
         if self.direction == "rtl":
             glyphs = list(reversed(glyphs))
-        if self.rules["faraway"]:
+        if "faraway" in self.rules:
             for firstIx, first in enumerate(glyphs):
                 passedBases = 0
                 nonAdjacent = firstIx + 1
@@ -295,7 +295,7 @@ class Collidoscope:
                         overlaps = list(filter(lambda x: ((x.path1.hasAnchor and not x.path2.hasAnchor) or (x.path2.hasAnchor and not x.path1.hasAnchor)), overlaps))
                         if not overlaps: continue
                         return overlaps
-                if "area" in self.rules and self.rules["area"] > 0:
+                if "area" in self.rules:
                     overlaps = self.find_overlaps(first, second)
                     if not overlaps: continue
                     newoverlaps = []
@@ -305,7 +305,7 @@ class Collidoscope:
                             ia = i.area
                             # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
                             if ia > i1.path1.area * self.rules["area"] or ia > i1.path2.area*self.rules["area"]:
-                                newoverlaps.append(i)
+                                newoverlaps.append(i1)
                     if newoverlaps:
                         return newoverlaps
         return False
