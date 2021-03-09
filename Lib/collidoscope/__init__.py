@@ -308,5 +308,5 @@ class Collidoscope:
                                 newoverlaps.append(i1)
                     if newoverlaps:
                         return newoverlaps
-        return False
+        return []
 
