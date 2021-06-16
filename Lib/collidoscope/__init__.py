@@ -274,7 +274,7 @@ class Collidoscope:
                 if g["category"] == "base":
                     cluster_id += 1
                 cluster_ids.append(cluster_id)
-            for i in range(1,len(glyphs)-1):
+            for i in range(0,len(glyphs)-1):
                 for j in range(i+1, len(glyphs)):
                     if cluster_ids[i] - cluster_ids[j] in (-1, 0, 1):
                         overlaps = self.find_overlaps(glyphs[i], glyphs[j])
