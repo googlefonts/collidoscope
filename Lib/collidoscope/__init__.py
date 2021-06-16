@@ -41,6 +41,8 @@ class Collidoscope:
                 overlap. Mark glyphs are ignored. All collisions are reported.
             marks (boolean): If true, collisions between all pairs of marks in
                 the string are reported.
+            adjacent_clusters (boolean): If true, collisions between all pairs 
+                of glyphs in adjacent clusters are reported.
             cursive (boolean): If true, adjacent glyphs are tested for overlap.
                 Paths containing cursive anchors are allowed to overlap, but
                 collisions between other paths are reported.
@@ -262,7 +264,6 @@ class Collidoscope:
             glyphs = list(reversed(glyphs))
         if "faraway" in self.rules:
             for firstIx, first in enumerate(glyphs):
-                passedBases = 0
                 nonAdjacent = firstIx + 1
                 # print("Considering %i" % firstIx)
                 if first["category"] == "base":
