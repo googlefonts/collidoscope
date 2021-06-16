@@ -18,6 +18,17 @@ class Collision(NamedTuple):
     path2: BezierPath
     point: Point
 
+def _get_sequential_cluster_ids(glyphs):
+    cur_cluster = None
+    sci = 0  # sequential cluster ID
+    scis = []
+    for g in glyphs:
+        if g["cluster"] != cur_cluster:
+            sci += 1
+            cur_cluster = g["cluster"]
+        scis.append(sci)
+    return scis
+
 
 class Collidoscope:
     """Detect collisions between font glyphs"""
@@ -194,6 +205,7 @@ class Collidoscope:
             name = glyf.getGlyphName(info.codepoint)
             g = self.get_positioned_glyph(name, position)
             g["advance"] = pos.position[2]
+            g["cluster"] = info.cluster
             for p in g["paths"]:
                 p.origin = info.cluster
                 p.glyphIndex = ix
@@ -268,15 +280,10 @@ class Collidoscope:
                     if overlaps: return overlaps
 
         if "adjacent_clusters" in self.rules:
-            cluster_id = 0
-            cluster_ids = []
-            for g in glyphs:
-                if g["category"] == "base":
-                    cluster_id += 1
-                cluster_ids.append(cluster_id)
+            scis = _get_sequential_cluster_ids(glyphs)
             for i in range(0,len(glyphs)-1):
                 for j in range(i+1, len(glyphs)):
-                    if cluster_ids[i] - cluster_ids[j] in (-1, 0, 1):
+                    if scis[i] - scis[j] in (-1, 0, 1):
                         overlaps = self.find_overlaps(glyphs[i], glyphs[j])
                         if overlaps: return overlaps
 
