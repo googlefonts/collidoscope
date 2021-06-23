@@ -30,6 +30,9 @@ def _get_sequential_cluster_ids(glyphs):
     return scis
 
 
+_KNOWN_RULES = ["faraway", "marks", "adjacent_clusters", "cursive", "area"]
+
+
 class Collidoscope:
     """Detect collisions between font glyphs"""
 
@@ -76,6 +79,39 @@ class Collidoscope:
             self.get_anchors()
         else:
             self.anchors = {}
+
+
+    def get_rules(self):
+        """Return all rules that are known.
+
+        This can be used to implement a kind of versioning of the interface
+        to collidoscope.
+
+        E.g. if the client wants to be sure that it is running against a
+        version of collidoscope with the new adjacent_clusters rule,
+        the client can just make sure that the adjacent_clusters rule gets
+        "echoed back" or "acknowledged" by this routine.
+
+        In practice, just the existence of this routine accomplishes the
+        same version-detection for this particular adjacent_clusters feature.
+
+        Alternately, we could use whatever the real/official mechanism is
+        for versioning a Python module, presumably a 3-integer dotted SemVer?
+
+        Version: 0.0.6 in collidoscope.egg-info/PKG-INFO?
+
+        But this routine provides something perhaps useful beyond versioning:
+        it can be used to make sure that the rules passed in don't have a typo
+        in them.
+
+        One might imagine enforcing all this in the constructor, e.g.
+        throwing an exception if an unknown rule is passed in.
+
+        But that would prevent a more gentle "use this rule if you have it"
+        semantics for some future rule.
+        """
+        return {rk: rv for rk, rv in self.rules.items() if rk in _KNOWN_RULES}
+
 
     def prep_shaper(self):
         face = hb.Face(self.fontbinary)
