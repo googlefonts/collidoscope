@@ -11,6 +11,8 @@ parser.add_argument('--no-faraway', action='store_false', dest="faraway",
                     help="don't check for interactions between non-adjacent glyphs")
 parser.add_argument('--no-marks', action='store_false', dest="marks",
                     help="don't check for interactions between marks")
+parser.add_argument('--no-adjacent-clusters', action='store_false', dest="adjacent_clusters",
+                    help="don't check for interactions between glyphs in adjacent clusters")
 parser.add_argument('--cursive', action='store_true', dest="cursive",
                     help="check for interactions between paths without anchors")
 parser.add_argument('--area', type=int, default=0, dest="area",
@@ -27,6 +29,7 @@ fontfilename = args.input
 
 c = Collidoscope(fontfilename, {
         "faraway": args.faraway,
+        "adjacent_clusters": args.adjacent_clusters,
         "cursive": args.cursive,
         "area":    args.area / 100,
         "marks":   args.marks

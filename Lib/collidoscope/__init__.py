@@ -18,6 +18,20 @@ class Collision(NamedTuple):
     path2: BezierPath
     point: Point
 
+def _get_sequential_cluster_ids(glyphs):
+    cur_cluster = None
+    sci = 0  # sequential cluster ID
+    scis = []
+    for g in glyphs:
+        if g["cluster"] != cur_cluster:
+            sci += 1
+            cur_cluster = g["cluster"]
+        scis.append(sci)
+    return scis
+
+
+_KNOWN_RULES = ["faraway", "marks", "adjacent_clusters", "cursive", "area"]
+
 
 class Collidoscope:
     """Detect collisions between font glyphs"""
@@ -30,6 +44,8 @@ class Collidoscope:
                 overlap. Mark glyphs are ignored. All collisions are reported.
             marks (boolean): If true, collisions between all pairs of marks in
                 the string are reported.
+            adjacent_clusters (boolean): If true, collisions between all pairs 
+                of glyphs in adjacent clusters are reported.
             cursive (boolean): If true, adjacent glyphs are tested for overlap.
                 Paths containing cursive anchors are allowed to overlap, but
                 collisions between other paths are reported.
@@ -63,6 +79,39 @@ class Collidoscope:
             self.get_anchors()
         else:
             self.anchors = {}
+
+
+    def get_rules(self):
+        """Return all rules that are known.
+
+        This can be used to implement a kind of versioning of the interface
+        to collidoscope.
+
+        E.g. if the client wants to be sure that it is running against a
+        version of collidoscope with the new adjacent_clusters rule,
+        the client can just make sure that the adjacent_clusters rule gets
+        "echoed back" or "acknowledged" by this routine.
+
+        In practice, just the existence of this routine accomplishes the
+        same version-detection for this particular adjacent_clusters feature.
+
+        Alternately, we could use whatever the real/official mechanism is
+        for versioning a Python module, presumably a 3-integer dotted SemVer?
+
+        Version: 0.0.6 in collidoscope.egg-info/PKG-INFO?
+
+        But this routine provides something perhaps useful beyond versioning:
+        it can be used to make sure that the rules passed in don't have a typo
+        in them.
+
+        One might imagine enforcing all this in the constructor, e.g.
+        throwing an exception if an unknown rule is passed in.
+
+        But that would prevent a more gentle "use this rule if you have it"
+        semantics for some future rule.
+        """
+        return {rk: rv for rk, rv in self.rules.items() if rk in _KNOWN_RULES}
+
 
     def prep_shaper(self):
         face = hb.Face(self.fontbinary)
@@ -194,6 +243,7 @@ class Collidoscope:
             name = glyf.getGlyphName(info.codepoint)
             g = self.get_positioned_glyph(name, position)
             g["advance"] = pos.position[2]
+            g["cluster"] = info.cluster
             for p in g["paths"]:
                 p.origin = info.cluster
                 p.glyphIndex = ix
@@ -250,7 +300,6 @@ class Collidoscope:
             glyphs = list(reversed(glyphs))
         if "faraway" in self.rules:
             for firstIx, first in enumerate(glyphs):
-                passedBases = 0
                 nonAdjacent = firstIx + 1
                 # print("Considering %i" % firstIx)
                 if first["category"] == "base":
@@ -266,6 +315,14 @@ class Collidoscope:
                     # print("Faraway test %s %s" % (first["name"], second["name"]))
                     overlaps = self.find_overlaps(first, second)
                     if overlaps: return overlaps
+
+        if "adjacent_clusters" in self.rules:
+            scis = _get_sequential_cluster_ids(glyphs)
+            for i in range(0,len(glyphs)-1):
+                for j in range(i+1, len(glyphs)):
+                    if scis[i] - scis[j] in (-1, 0, 1):
+                        overlaps = self.find_overlaps(glyphs[i], glyphs[j])
+                        if overlaps: return overlaps
 
         if "marks" in self.rules:
             # print("Mark testing")
