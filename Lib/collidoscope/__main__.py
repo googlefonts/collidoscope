@@ -1,5 +1,5 @@
 from collidoscope import Collidoscope
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType
 import sys
 
 parser = ArgumentParser()
@@ -11,6 +11,8 @@ parser.add_argument('--no-faraway', action='store_false', dest="faraway",
                     help="don't check for interactions between non-adjacent glyphs")
 parser.add_argument('--no-marks', action='store_false', dest="marks",
                     help="don't check for interactions between marks")
+parser.add_argument('--no-bases', action='store_false', dest="bases",
+                    help="don't check for interactions between bases")
 parser.add_argument('--no-adjacent-clusters', action='store_false', dest="adjacent_clusters",
                     help="don't check for interactions between glyphs in adjacent clusters")
 parser.add_argument('--cursive', action='store_true', dest="cursive",
@@ -21,9 +23,19 @@ parser.add_argument('--area', type=int, default=0, dest="area",
 parser.add_argument('-r', dest="range",
                     help="Comma-separated list of Unicode ranges", metavar="RANGE")
 
+parser.add_argument('-t', dest="text",
+                    help="Text to check", metavar="TEXT")
+
+parser.add_argument('-f', dest="file", type=FileType('r'),
+                    help="File of lines to check", metavar="FILE")
+
+parser.add_argument('-o', dest="output", type=FileType('w'), default="report.html",
+                    help="Output report file", metavar="FILE")
+
+
 args = parser.parse_args()
 
-report = open("report.html", "w")
+report = args.output
 
 fontfilename = args.input
 
@@ -32,27 +44,10 @@ c = Collidoscope(fontfilename, {
         "adjacent_clusters": args.adjacent_clusters,
         "cursive": args.cursive,
         "area":    args.area / 100,
-        "marks":   args.marks
+        "marks":   args.marks,
+        "bases":   args.bases
     })
 
-codepoints = c.font["cmap"].getBestCmap().keys()
-codepointfilter = []
-if args.range:
-    for r in args.range.split(","):
-        if "-" in r:
-            first, last = r.split("-")
-            codepointfilter.extend(range(int(first, 16),int(last,16)+1))
-        else:
-            codepointfilter.append(int(r,16))
-    codepoints = list(filter(lambda x: x in codepointfilter, codepoints))
-else:
-    print("Testing ALL GLYPHS AGAINST ALL GLYPHS - you may want to specify a -r range e.g. -r 0620-064A")
-combinations = []
-count = 1
-
-for i in range(0,args.context):
-    combinations.append(codepoints)
-    count = count * len(codepoints)
 
 import itertools
 
@@ -84,10 +79,45 @@ padding: .5rem;
 <div class="cards">
 ''' %  c.font["name"].getDebugName(1))
 
+codepoints = c.font["cmap"].getBestCmap().keys()
+codepointfilter = []
+
+
+def gen_texts(codepoints):
+    combinations = []
+    texts = []
+
+    for i in range(0,args.context):
+        combinations.append(codepoints)
+        count = count * len(codepoints)
+
+    for element in itertools.product(*combinations):
+        text = "".join(map(chr, element))
+        texts.append(text)
+    return texts
+
+
+if args.text:
+    texts = [args.text]
+elif args.file:
+    texts = [ x.rtrim() for x in args.file.readlines()]
+elif args.range:
+    for r in args.range.split(","):
+        if "-" in r:
+            first, last = r.split("-")
+            codepointfilter.extend(range(int(first, 16),int(last,16)+1))
+        else:
+            codepointfilter.append(int(r,16))
+    codepoints = list(filter(lambda x: x in codepointfilter, codepoints))
+    texts = gen_text(codepoints)
+else:
+    print("Testing ALL GLYPHS AGAINST ALL GLYPHS - you may want to specify a -r range e.g. -r 0620-064A")
+    texts = gen_text(codepoints)
+
+count = 1
 counter = 0
-for element in itertools.product(*combinations):
+for text in texts:
     c.prep_shaper()
-    text = "".join(map(chr, element))
     if counter % 1 == 0:
         sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, count, counter/count*100))
     glyphs = c.get_glyphs(text)
@@ -104,6 +134,7 @@ report.write('''
 </html>
 ''')
 
+print("Output written on %s" % args.output.name)
 # hbfont = prep_shaper(fontfilename)
 # glyphs = get_glyphs(hbfont, font, "ۍ", anchors)
 # print(has_collisions(glyphs, 1, {
