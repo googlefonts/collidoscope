@@ -25,11 +25,11 @@ This creates a collision report on `report.html` for all sequences of three char
 
 This creates a collision report on `report.html` for all sequences of three characters within the range 0x620 to 0x64A and also 0x679 to 0x6D3, and turns on the area test at a tolerance of 10% of the area of the smallest path involved in collision.
 
-    python3 -m collidoscope -c 5 -cursive yourfont.otf
+    python3 -m collidoscope -c 5 --cursive yourfont.otf
 
 This tests for non-adjacent glyphs and collisions not involving cursive connection for *all combinations of glyphs in your font* with a five-character string. This may take a number of years to compute.
 
-    python3 -m collidoscope -c 5 -cursive yourfont.otf
+    python3 -m collidoscope -c 2 -r 0620-064A --area 5 yourfont.otf
 
 This just runs an area test for two-character sequences across the basic Arabic range.
 
@@ -56,6 +56,8 @@ The rules dictionary may contain the following entries:
 overlap. Mark glyphs are ignored. All collisions are reported.
 * marks (boolean): If true, collisions between all pairs of marks in
 the string are reported.
+* bases (boolean): If *false*, collisions between all pairs of bases in
+the string are *ignored*.
 * cursive (boolean): If true, adjacent glyphs are tested for overlap.
 Paths containing cursive anchors are allowed to overlap, but
 collisions between other paths are reported.
