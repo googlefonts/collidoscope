@@ -7,7 +7,7 @@ from beziers.path.geometricshapes import Rectangle
 from beziers.utils.linesweep import bbox_intersections
 from beziers.point import Point
 from beziers.boundingbox import BoundingBox
-from glyphtools import categorize_glyph
+from glyphtools import categorize_glyph, get_beziers
 import sys
 from typing import NamedTuple
 
@@ -136,7 +136,6 @@ class Collidoscope:
         return Rectangle(vec.x, vec.y, origin=bb.bl + vec * 0.5)
 
     def get_anchors(self):
-        glyf = self.font["glyf"]
         # Find the GPOS CursiveAttachment lookups
         cursives = filter(
             lambda x: x.LookupType == 3, self.font["GPOS"].table.LookupList.Lookup
@@ -165,7 +164,7 @@ class Collidoscope:
     def get_cached_glyph(self, name):
         if name in self.glyphcache:
             return self.glyphcache[name]
-        paths = BezierPath.fromFonttoolsGlyph(self.font, name)
+        paths = get_beziers(self.font, name)
         pathbounds = []
         paths = list(filter(lambda p: p.length > 0, paths))
         for p in paths:
