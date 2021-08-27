@@ -8,6 +8,7 @@ from beziers.utils.linesweep import bbox_intersections
 from beziers.point import Point
 from beziers.boundingbox import BoundingBox
 from glyphtools import categorize_glyph, get_beziers
+import glyphtools
 import sys
 from typing import NamedTuple
 
@@ -71,14 +72,17 @@ class Collidoscope:
         self.fontfilename = fontfilename
         self.glyphcache = {}
         self.direction = direction
+        self.fontbinary = None
         if ttFont:
             self.font = ttFont
-            self.fontbinary = ttFont.reader.file.read()
+            if not glyphtools.babelfont.isbabelfont(ttFont):
+                self.fontbinary = ttFont.reader.file.read()
         else:
             self.fontbinary = Path(fontfilename).read_bytes()
             self.font = TTFont(fontfilename)
         self.rules = rules
-        self.prep_shaper()
+        if self.fontbinary:
+            self.prep_shaper()
         if "cursive" in self.rules and self.rules["cursive"]:
             self.get_anchors()
         else:
@@ -261,11 +265,7 @@ class Collidoscope:
 
             name = glyf.getGlyphName(info.codepoint)
             g = self.get_positioned_glyph(name, position)
-            g["advance"] = pos.position[2]
             g["cluster"] = info.cluster
-            for p in g["paths"]:
-                p.origin = info.cluster
-                p.glyphIndex = ix
             glyphs.append(g)
             ix = ix + 1
             cursor = cursor + pos.position[2]
@@ -316,7 +316,7 @@ class Collidoscope:
         #   "Far away" (adjacency > 1) glyphs should not interact at all
         # print("Faraway test")
         glyphs = glyphs_in
-        if self.direction == "rtl":
+        if self.direction == "RTL":
             glyphs = list(reversed(glyphs))
         if "faraway" in self.rules:
             for firstIx, first in enumerate(glyphs):
