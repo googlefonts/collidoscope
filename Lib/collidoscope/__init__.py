@@ -39,7 +39,7 @@ _KNOWN_RULES = ["faraway", "marks", "adjacent_clusters", "cursive", "area"]
 class Collidoscope:
     """Detect collisions between font glyphs"""
 
-    def __init__(self, fontfilename, rules, direction="LTR", ttFont=None):
+    def __init__(self, fontfilename, rules, direction="LTR", ttFont=None, scale_factor=1.0):
         """Create a collision detector.
 
         The rules dictionary may contain the following entries:
@@ -68,11 +68,13 @@ class Collidoscope:
             rules: dictionary of collision rules.
             ttFont: fontTools object (loaded from file if not given).
             direction: "LTR" or "RTL"
+            scale_factor: Outlines are scaled by this factor before comparison.
         """
         self.fontfilename = fontfilename
         self.glyphcache = {}
         self.direction = direction
         self.fontbinary = None
+        self.scale_factor = scale_factor
         if ttFont:
             self.font = ttFont
             if not glyphtools.babelfont.isbabelfont(ttFont):
@@ -165,12 +167,28 @@ class Collidoscope:
                         )
         self.anchors = anchors
 
+    def scale_path(self, p, centroid):
+        if self.scale_factor == 1.0:
+            return p
+        p.translate(centroid * -1)
+        p.scale(self.scale_factor)
+        p.translate(centroid)
+        return p
+
     def get_cached_glyph(self, name):
         if name in self.glyphcache:
             return self.glyphcache[name]
         paths = get_beziers(self.font, name)
         pathbounds = []
         paths = list(filter(lambda p: p.length > 0, paths))
+
+        # First find pre-scale centroid
+        glyphbounds = BoundingBox()
+        for p in paths:
+            glyphbounds.extend(p.bounds())
+
+        paths = [self.scale_path(p, glyphbounds.centroid) for p in paths]
+
         for p in paths:
             p.hasAnchor = False
             p.glyphname = name

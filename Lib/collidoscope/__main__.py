@@ -19,6 +19,8 @@ parser.add_argument('--cursive', action='store_true', dest="cursive",
                     help="check for interactions between paths without anchors")
 parser.add_argument('--area', type=int, default=0, dest="area",
                     help="check for interactions of size >=area%% between paths")
+parser.add_argument('--scale-factor', dest="scale_factor",
+                    help="Scale glyphs before checking", metavar="SCALE", default=1.0)
 
 parser.add_argument('-r', dest="range",
                     help="Comma-separated list of Unicode ranges", metavar="RANGE")
@@ -46,7 +48,9 @@ c = Collidoscope(fontfilename, {
         "area":    args.area / 100,
         "marks":   args.marks,
         "bases":   args.bases
-    })
+    },
+    scale_factor = float(args.scale_factor)
+)
 
 
 import itertools
