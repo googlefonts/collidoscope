@@ -322,125 +322,74 @@ class Collidoscope:
     def has_collisions(self, glyphs_in):
         """Run the collision detection algorithm according to the rules provided.
 
-        Note that this does not find *all* overlaps, but returns as soon
-        as some collisions are found.
-
         Args:
             glyphs: A list of glyph dictionaries returned by ``get_glyphs``.
 
         Returns: A list of Collision objects.
         """
-        # Rules for collision detection:
-        #   "Far away" (adjacency > 1) glyphs should not interact at all
-        # print("Faraway test")
         glyphs = glyphs_in
         if self.direction == "RTL":
             glyphs = list(reversed(glyphs))
-        if "faraway" in self.rules:
-            for firstIx, first in enumerate(glyphs):
-                nonAdjacent = firstIx + 1
-                # print("Considering %i" % firstIx)
-                if first["category"] == "base":
-                    # Skip mark and next base
-                    while (
-                        nonAdjacent < len(glyphs)
-                        and glyphs[nonAdjacent]["category"] == "mark"
-                    ):
-                        nonAdjacent = nonAdjacent + 1
-                    nonAdjacent = nonAdjacent + 1
-                if nonAdjacent >= len(glyphs):
-                    continue
 
-                for secondIx in range(nonAdjacent, len(glyphs)):
-                    second = glyphs[secondIx]
-                    if (
-                        first["category"] == "base"
-                        and second["category"] == "base"
-                        and not self.rules.get("bases", True)
-                    ):
-                        continue
+        overlaps = []
+        for firstIx, first in enumerate(glyphs):
+            for secondIx, second in enumerate(glyphs):
+                if self.we_care_about_this_index(firstIx, secondIx, glyphs):
+                    for o in self.find_overlaps(first, second):
+                        if self.we_care_about_this_overlap(firstIx, secondIx, glyphs, o):
+                            overlaps.append(o)
+        return overlaps
 
-                    # print("Faraway test %s %s" % (first["name"], second["name"]))
-                    overlaps = self.find_overlaps(first, second)
-                    if overlaps:
-                        return overlaps
+    def we_care_about_this_index(self, left_ix, right_ix, glyphs):
+        if right_ix == left_ix:
+            return False
+        left = glyphs[left_ix]
+        right = glyphs[right_ix]
+        if not self.rules.get("bases"):
+            if left["category"] == "base" and right["category"] == "base":
+                return False
 
-        if "adjacent_clusters" in self.rules:
-            scis = _get_sequential_cluster_ids(glyphs)
-            for i in range(0, len(glyphs) - 1):
-                for j in range(i + 1, len(glyphs)):
-                    if scis[i] - scis[j] in (-1, 0, 1):
-                        overlaps = self.find_overlaps(glyphs[i], glyphs[j])
-                        if (
-                            glyphs[i]["category"] == "base"
-                            and glyphs[j]["category"] == "base"
-                            and not self.rules.get("bases", True)
-                        ):
-                            continue
+        if self.rules.get("marks"):
+            if left["category"] == "mark" and right["category"] == "mark":
+                return True
 
-                        if overlaps:
-                            return overlaps
+        if self.rules.get("faraway"):
+            next_base = left_ix + 1
+            while next_base < len(glyphs) and glyphs[next_base]["category"] == glyphs[left_ix]["category"]:
+                next_base += 1
+            if right_ix >= next_base:
+                return True
 
-        if "marks" in self.rules:
-            # print("Mark testing")
-            for i in range(1, len(glyphs) - 1):
-                if glyphs[i]["category"] != "mark":
-                    continue
-                for j in range(i + 1, len(glyphs)):
-                    if glyphs[j]["category"] != "mark":
-                        continue
-                    overlaps = self.find_overlaps(glyphs[i], glyphs[j])
-                    # print(overlaps)
-                    if overlaps:
-                        return overlaps
+        if self.rules.get("adjacent_clusters"):
+            adjacency = abs(left["cluster"] - right["cluster"])
+            if adjacency < 2:
+                return True
 
-        #   Where there anchors between a glyph pair, the anchored paths should be
-        #   allowed to collide but others should not
-        # XX this rule does not work when cursive attachment is used occasionally
-        # print("Area and anchor test")
-        if "cursive" in self.rules or "area" in self.rules:
-            for firstIx in range(0, len(glyphs) - 1):
-                first = glyphs[firstIx]
-                second = glyphs[firstIx + 1]
-                if "cursive" in self.rules and self.rules["cursive"]:
-                    firstHasAnchors = any([x.hasAnchor for x in first["paths"]])
-                    secondHasAnchors = any([x.hasAnchor for x in first["paths"]])
-                    if firstHasAnchors or secondHasAnchors:
-                        overlaps = self.find_overlaps(first, second)
-                        overlaps = list(
-                            filter(
-                                lambda x: (
-                                    (x.path1.hasAnchor and not x.path2.hasAnchor)
-                                    or (x.path2.hasAnchor and not x.path1.hasAnchor)
-                                ),
-                                overlaps,
-                            )
-                        )
-                        if not overlaps:
-                            continue
-                        return overlaps
-                if "area" in self.rules:
-                    if (
-                        first["category"] == "base"
-                        and second["category"] == "base"
-                        and not self.rules.get("bases", True)
-                    ):
-                        continue
+        return False
 
-                    overlaps = self.find_overlaps(first, second)
-                    if not overlaps:
-                        continue
-                    newoverlaps = []
-                    for i1 in overlaps:
-                        intersect = i1.path1.intersection(i1.path2, flat=True)
-                        for i in intersect:
-                            ia = i.area
-                            # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
-                            if (
-                                ia > i1.path1.area * self.rules["area"]
-                                or ia > i1.path2.area * self.rules["area"]
-                            ):
-                                newoverlaps.append(i1)
-                    if newoverlaps:
-                        return newoverlaps
-        return []
+    def we_care_about_this_overlap(self, firstIx, secondIx, glyphs, o):
+        if self.rules.get("cursive"):
+            first = glyphs[firstIx]
+            second = glyphs[secondIx]
+            first_has_anchors = any([x.hasAnchor for x in first["paths"]])
+            second_has_anchors = any([x.hasAnchor for x in second["paths"]])
+            if first_has_anchors and second_has_anchors:
+                # if there's a base in between, these aren't anchored together
+                # so we do care about them
+                for i in range(firstIx+1, secondIx):
+                    if glyphs[i]["category"] == "base":
+                        return True
+                return False
+
+        if self.rules.get("area"):
+            intersect = o.path1.intersection(o.path2, flat=True)
+            for i in intersect:
+                ia = i.area
+                # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
+                if (
+                    ia > i1.path1.area * self.rules["area"]
+                    or ia > i1.path2.area * self.rules["area"]
+                ):
+                    return True
+            return False
+        return True
