@@ -345,9 +345,11 @@ class Collidoscope:
             return False
         left = glyphs[left_ix]
         right = glyphs[right_ix]
-        if not self.rules.get("bases"):
-            if left["category"] == "base" and right["category"] == "base":
+        if left["category"] == "base" and right["category"] == "base":
+            if self.rules.get("bases") is False:
                 return False
+            if self.rules.get("bases"):
+                return True
 
         if self.rules.get("marks"):
             if left["category"] == "mark" and right["category"] == "mark":
