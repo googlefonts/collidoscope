@@ -91,6 +91,7 @@ def gen_texts(codepoints):
     combinations = []
     texts = []
 
+    count = 1
     for i in range(0,args.context):
         combinations.append(codepoints)
         count = count * len(codepoints)
@@ -98,9 +99,10 @@ def gen_texts(codepoints):
     for element in itertools.product(*combinations):
         text = "".join(map(chr, element))
         texts.append(text)
-    return texts
+    return texts, count
 
 
+count = 1
 if args.text:
     texts = [args.text]
 elif args.file:
@@ -113,12 +115,11 @@ elif args.range:
         else:
             codepointfilter.append(int(r,16))
     codepoints = list(filter(lambda x: x in codepointfilter, codepoints))
-    texts = gen_text(codepoints)
+    texts, count = gen_texts(codepoints)
 else:
     print("Testing ALL GLYPHS AGAINST ALL GLYPHS - you may want to specify a -r range e.g. -r 0620-064A")
-    texts = gen_text(codepoints)
+    texts, count = gen_texts(codepoints)
 
-count = 1
 counter = 0
 for text in texts:
     c.prep_shaper()
