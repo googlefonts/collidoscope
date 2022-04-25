@@ -389,8 +389,8 @@ class Collidoscope:
                 ia = i.area
                 # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
                 if (
-                    ia > i1.path1.area * self.rules["area"]
-                    or ia > i1.path2.area * self.rules["area"]
+                    ia > o.path1.area * self.rules["area"]
+                    or ia > o.path2.area * self.rules["area"]
                 ):
                     return True
             return False
