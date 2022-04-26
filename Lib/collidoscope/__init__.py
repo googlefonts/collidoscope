@@ -49,6 +49,8 @@ class Collidoscope:
                 the string are reported.
             bases (boolean): If *false*, collisions between all pairs of bases in
                 the string are *ignored*.
+            bases_marks (boolean): If true, collisions between all pairs of bases
+                and marks in the string are reports.
             adjacent_clusters (boolean): If true, collisions between all pairs 
                 of glyphs in adjacent clusters are reported.
             cursive (boolean): If true, adjacent glyphs are tested for overlap.
@@ -354,6 +356,11 @@ class Collidoscope:
         if self.rules.get("marks"):
             if left["category"] == "mark" and right["category"] == "mark":
                 return True
+
+        if self.rules.get("bases_marks"):
+            # If we reached here since left and right are not of the same
+            # category.
+            return True
 
         if self.rules.get("faraway"):
             next_base = left_ix + 1
