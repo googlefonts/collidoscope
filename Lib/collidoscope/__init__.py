@@ -345,7 +345,7 @@ class Collidoscope:
             return False
         left = glyphs[left_ix]
         right = glyphs[right_ix]
-        if left["category"] == "base" and right["category"] == "base":
+        if left["category"] != "mark" and right["category"] != "mark":
             if self.rules.get("bases") is False:
                 return False
             if self.rules.get("bases"):
@@ -379,7 +379,7 @@ class Collidoscope:
                 # if there's a base in between, these aren't anchored together
                 # so we do care about them
                 for i in range(firstIx+1, secondIx):
-                    if glyphs[i]["category"] == "base":
+                    if glyphs[i]["category"] != "mark":
                         return True
                 return False
 
