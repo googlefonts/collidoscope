@@ -1,4 +1,4 @@
-beziers>=0.0.3
+kurbopy>=0.8.32
 uharfbuzz
 fonttools
 glyphtools
