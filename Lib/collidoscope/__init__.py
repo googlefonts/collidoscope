@@ -2,12 +2,9 @@ import uharfbuzz as hb
 import re
 from pathlib import Path
 from fontTools.ttLib import TTFont
-from beziers.path import BezierPath
-from beziers.path.geometricshapes import Rectangle
-from beziers.utils.linesweep import bbox_intersections
-from beziers.point import Point
-from beziers.boundingbox import BoundingBox
-from glyphtools import categorize_glyph, get_beziers
+from glyphtools import categorize_glyph
+from babelfont import load
+from kurbopy import BezPath, Point, TranslateScale, Vec2, Rect
 import glyphtools
 import sys
 from typing import NamedTuple
@@ -16,8 +13,8 @@ from typing import NamedTuple
 class Collision(NamedTuple):
     glyph1: str
     glyph2: str
-    path1: BezierPath
-    path2: BezierPath
+    path1: BezPath
+    path2: BezPath
     point: Point
 
 
@@ -39,7 +36,7 @@ _KNOWN_RULES = ["faraway", "marks", "adjacent_clusters", "cursive", "area"]
 class Collidoscope:
     """Detect collisions between font glyphs"""
 
-    def __init__(self, fontfilename, rules, direction="LTR", ttFont=None, scale_factor=1.0):
+    def __init__(self, fontfilename, rules, direction="LTR", babelfont=None, master=None, scale_factor=1.0):
         """Create a collision detector.
 
         The rules dictionary may contain the following entries:
@@ -66,7 +63,7 @@ class Collidoscope:
         Args:
             fontfilename: file name of font.
             rules: dictionary of collision rules.
-            ttFont: fontTools object (loaded from file if not given).
+            babelfont: babelfont object (loaded from file if not given).
             direction: "LTR" or "RTL"
             scale_factor: Outlines are scaled by this factor before comparison.
         """
@@ -75,13 +72,20 @@ class Collidoscope:
         self.direction = direction
         self.fontbinary = None
         self.scale_factor = scale_factor
-        if ttFont:
-            self.font = ttFont
-            if not glyphtools.babelfont.isbabelfont(ttFont):
+        if babelfont:
+            self.font = babelfont
+            if not glyphtools.babelfont.isbabelfont(babelfont):
                 self.fontbinary = ttFont.reader.file.read()
         else:
             self.fontbinary = Path(fontfilename).read_bytes()
-            self.font = TTFont(fontfilename)
+            self.font = load(fontfilename)
+        if master:
+            masters = [ m for m in self.font.masters if m.name.get_default() == master ]
+            if not masters:
+                raise ValueError("Could not find a master called %s" % master)
+            self.master = masters[0]
+        else:
+            self.master = self.font.default_master
         self.rules = rules
         if self.fontbinary:
             self.prep_shaper()
@@ -89,6 +93,14 @@ class Collidoscope:
             self.get_anchors()
         else:
             self.anchors = {}
+
+        self.glyphcache = {}
+
+    def get_beziers(self, glyph):
+        glyphset = {k: self.master.get_glyph_layer(k) for k in self.font.glyphs.keys()}
+        layer = self.master.get_glyph_layer(glyph)
+        rv = BezPath.fromDrawable(layer, glyphset)
+        return rv
 
     def get_rules(self):
         """Return all rules that are known.
@@ -167,101 +179,72 @@ class Collidoscope:
                         )
         self.anchors = anchors
 
-    def scale_path(self, p, centroid):
-        if self.scale_factor == 1.0:
-            return p
-        p.translate(centroid * -1)
-        p.scale(self.scale_factor)
-        p.translate(centroid)
-        return p
+    def scale_path(self, p):
+        centroid = p.bounding_box().center()
+        out = TranslateScale.translate(Vec2(centroid.x * -1, centroid.y * -1))
+        scale = TranslateScale.scale(self.scale_factor)
+        in_ = TranslateScale.translate(Vec2(centroid.x, centroid.y))
+        transform = out * scale * in_
+        return transform * p
 
     def get_cached_glyph(self, name):
         if name in self.glyphcache:
             return self.glyphcache[name]
-        paths = get_beziers(self.font, name)
-        pathbounds = []
-        paths = list(filter(lambda p: p.length > 0, paths))
+        paths = self.get_beziers(name)
 
-        # First find pre-scale centroid
-        glyphbounds = BoundingBox()
-        for p in paths:
-            glyphbounds.extend(p.bounds())
-
-        paths = [self.scale_path(p, glyphbounds.centroid) for p in paths]
-
-        for p in paths:
-            p.hasAnchor = False
-            p.glyphname = name
-            if name in self.anchors:
-                for a in self.anchors[name]:
-                    if p.pointIsInside(Point(*a)):
-                        p.hasAnchor = True
-            bounds = p.bounds()
-            pathbounds.append(bounds)
-
-        glyphbounds = BoundingBox()
-        if pathbounds:
-            for p in pathbounds:
-                glyphbounds.extend(p)
+        paths = [self.scale_path(p) for p in paths]
+        has_anchor = False
+        if paths:
+            bbox = paths[0].bounding_box()
+            for p in paths:
+                bbox = bbox.union(p.bounding_box())
+                if name in self.anchors:
+                    for a in self.anchors[name]:
+                        if p.winding(Point(*a)) == +1:
+                            has_anchor = True
         else:
-            glyphbounds.tr = Point(0, 0)
-            glyphbounds.bl = Point(0, 0)
+            return {
+                "name": name,
+                "category": categorize_glyph(self.font, name)[0],
+                "paths": []
+            }
         self.glyphcache[name] = {
             "name": name,
             "paths": paths,
-            "pathbounds": pathbounds,
-            "glyphbounds": glyphbounds,
             "category": categorize_glyph(self.font, name)[0],
-            "pathconvexhull": None,  # XXX
+            "has_anchor": has_anchor,
+            "bbox": bbox,
         }
-        assert len(self.glyphcache[name]["pathbounds"]) == len(
-            self.glyphcache[name]["paths"]
-        )
         return self.glyphcache[name]
 
     def get_positioned_glyph(self, name, pos):
+        if not isinstance(pos, Point):
+            pos = Point(pos.x, pos.y)
         g = self.get_cached_glyph(name)
+        if not g["paths"]:
+            return g
+        translation = TranslateScale.translate(pos.to_vec2())
+
         positioned = {
             "name": g["name"],
-            "paths": [p.clone().translate(pos) for p in g["paths"]],
-            "pathbounds": [b.translated(pos) for b in g["pathbounds"]],
-            "glyphbounds": g["glyphbounds"].translated(pos),
+            "paths": [translation * p for p in g["paths"]],
             "category": g["category"],
+            "has_anchor": g["has_anchor"],
+            "bbox": translation * g["bbox"]
         }
-        assert len(positioned["pathbounds"]) == len(positioned["paths"])
-        # Copy path info
-        for old, new in zip(g["paths"], positioned["paths"]):
-            new.hasAnchor = old.hasAnchor
-            new.glyphname = old.glyphname
         return positioned
 
     def find_overlaps(self, g1, g2):
-        # print("Testing %s against %s" % (g1["name"], g2["name"]))
-        if not (g1["glyphbounds"].overlaps(g2["glyphbounds"])):
+        rv = []
+        if not g1["paths"] or not g2["paths"]:
             return []
-        # print("Glyph bounds overlap")
-
-        overlappingPathBounds = bbox_intersections(g1["paths"], g2["paths"])
-
-        if not overlappingPathBounds:
-            return []
-
-        overlappingPaths = {}
-        for p1, p2 in overlappingPathBounds:
-            left_segs = p1.asSegments()
-            right_segs = p2.asSegments()
-            overlappingSegBounds = bbox_intersections(left_segs, right_segs)
-            for s1, s2 in overlappingSegBounds:
-                intersects = s1.intersections(s2)
-                if len(intersects) > 0:
-                    overlappingPaths[(p1, p2)] = Collision(
-                        glyph1=g1["name"],
-                        glyph2=g2["name"],
-                        path1=p1,
-                        path2=p2,
-                        point=intersects[0].point,
-                    )
-        return list(overlappingPaths.values())
+        if g1["bbox"].intersect(g2["bbox"]).area() < 0.2:
+            return rv
+        for p1 in g1["paths"]:
+            for p2 in g2["paths"]:
+                for pt in p1.intersects(p2):
+                    rv.append(Collision(glyph1=g1, glyph2=g2, path1=p1, path2=p2, point=pt))
+        return rv
 
     def get_glyphs(self, text, buf=None):
         """Returns an list of dictionaries representing a shaped string.
@@ -274,14 +257,12 @@ class Collidoscope:
         returned can be fed to ``draw_overlaps`` and ``has_collisions``."""
         if not buf:
             buf = self.shape_a_text(text)
-        glyf = self.font["glyf"]
         cursor = 0
         glyphs = []
         ix = 0
         for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
             position = Point(cursor + pos.position[0], pos.position[1])
-
-            name = glyf.getGlyphName(info.codepoint)
+            name = list(self.font.glyphs)[info.codepoint].name
             g = self.get_positioned_glyph(name, position)
             g["cluster"] = info.cluster
             glyphs.append(g)
@@ -298,24 +279,25 @@ class Collidoscope:
             attribs: String of attributes added to SVG header.
         """
         svgpaths = []
-        bbox = glyphs[0]["glyphbounds"]
+        # bbox = glyphs[0]["glyphbounds"]
         col = ["green", "red", "purple", "blue", "yellow"]
         for ix, g in enumerate(glyphs):
-            bbox.extend(g["glyphbounds"])
+            # bbox.extend(g["glyphbounds"])
             for p in g["paths"]:
-                svgpaths.append(
-                    '<path d="%s" fill="%s"/>' % (p.asSVGPath(), col[ix % len(col)])
-                )
-        for c in collisions:
-            intersect = c.path1.intersection(c.path2)
-            for i in intersect:
-                svgpaths.append('<path d="%s" fill="black"/>' % (i.asSVGPath()))
+                pass
+                # svgpaths.append(
+                #     '<path d="%s" fill="%s"/>' % (p.asSVGPath(), col[ix % len(col)])
+                # )
+        # for c in collisions:
+        #     intersect = c.path1.intersection(c.path2)
+        #     for i in intersect:
+        #         svgpaths.append('<path d="%s" fill="black"/>' % (i.asSVGPath()))
         return '<svg %s viewBox="%i %i %i %i">%s</svg>\n' % (
             attribs,
-            bbox.left,
-            bbox.bottom,
-            bbox.width,
-            bbox.height,
+            0,
+            0,
+            0,
+            0,
             "\n".join(svgpaths),
         )
 
@@ -373,8 +355,8 @@ class Collidoscope:
         if self.rules.get("cursive"):
             first = glyphs[firstIx]
             second = glyphs[secondIx]
-            first_has_anchors = any([x.hasAnchor for x in first["paths"]])
-            second_has_anchors = any([x.hasAnchor for x in second["paths"]])
+            first_has_anchors = first["has_anchor"]
+            second_has_anchors = second["has_anchor"]
             if first_has_anchors and second_has_anchors:
                 # if there's a base in between, these aren't anchored together
                 # so we do care about them

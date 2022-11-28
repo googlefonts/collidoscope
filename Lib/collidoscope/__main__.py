@@ -2,6 +2,7 @@ from collidoscope import Collidoscope
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType
 import sys
 
+
 parser = ArgumentParser()
 parser.add_argument("input",
                     help="font file to process", metavar="OTF")
@@ -81,13 +82,17 @@ padding: .5rem;
 <body>
 <h2>Collision Report</h2>
 <div class="cards">
-''' %  c.font["name"].getDebugName(1))
+''' %  c.font.names.familyName.get_default())
 
-codepoints = c.font["cmap"].getBestCmap().keys()
+codepoints = c.font.unicode_map.keys()
 codepointfilter = []
 
 
+count = 1
+counter = 0
+
 def gen_texts(codepoints):
+    global count
     combinations = []
     texts = []
 
@@ -101,8 +106,7 @@ def gen_texts(codepoints):
         texts.append(text)
     return texts, count
 
-
-count = 1
+count = 0
 if args.text:
     texts = [args.text]
 elif args.file:
@@ -120,7 +124,6 @@ else:
     print("Testing ALL GLYPHS AGAINST ALL GLYPHS - you may want to specify a -r range e.g. -r 0620-064A")
     texts, count = gen_texts(codepoints)
 
-counter = 0
 for text in texts:
     c.prep_shaper()
     if counter % 1 == 0:
