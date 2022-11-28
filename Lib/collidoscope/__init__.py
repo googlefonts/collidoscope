@@ -36,7 +36,7 @@ _KNOWN_RULES = ["faraway", "marks", "adjacent_clusters", "cursive", "area"]
 class Collidoscope:
     """Detect collisions between font glyphs"""
 
-    def __init__(self, fontfilename, rules, direction="LTR", babelfont=None, master=None, scale_factor=1.0):
+    def __init__(self, fontfilename, rules, direction="LTR", babelfont=None, ttFont=None, master=None, scale_factor=1.0):
         """Create a collision detector.
 
         The rules dictionary may contain the following entries:
@@ -256,6 +256,8 @@ class Collidoscope:
         This is the first step in collision detection; the dictionaries
         returned can be fed to ``draw_overlaps`` and ``has_collisions``."""
         if not buf:
+            if not self.fontbinary:
+                raise ValueError("When shaping text without providing a buffer, ttFont must be provided")
             buf = self.shape_a_text(text)
         cursor = 0
         glyphs = []
