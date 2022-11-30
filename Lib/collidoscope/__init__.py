@@ -78,9 +78,9 @@ class Collidoscope:
                 self.fontbinary = ttFont.reader.file.read()
         else:
             self.fontbinary = Path(fontfilename).read_bytes()
-            self.font = load(fontfilename)
+            self.font = load(str(fontfilename))
         if master:
-            masters = [ m for m in self.font.masters if m.name.get_default() == master ]
+            masters = [m for m in self.font.masters if m.name.get_default() == master ]
             if not masters:
                 raise ValueError("Could not find a master called %s" % master)
             self.master = masters[0]
@@ -243,7 +243,7 @@ class Collidoscope:
         for p1 in g1["paths"]:
             for p2 in g2["paths"]:
                 for pt in p1.intersects(p2):
-                    rv.append(Collision(glyph1=g1, glyph2=g2, path1=p1, path2=p2, point=pt))
+                    rv.append(Collision(glyph1=g1["name"], glyph2=g2["name"], path1=p1, path2=p2, point=pt))
         return rv
 
     def get_glyphs(self, text, buf=None):
@@ -281,25 +281,25 @@ class Collidoscope:
             attribs: String of attributes added to SVG header.
         """
         svgpaths = []
-        # bbox = glyphs[0]["glyphbounds"]
+        bbox = glyphs[0]["bbox"]
         col = ["green", "red", "purple", "blue", "yellow"]
         for ix, g in enumerate(glyphs):
-            # bbox.extend(g["glyphbounds"])
+            if "bbox" in g:
+                bbox = bbox.union(g["bbox"])
             for p in g["paths"]:
-                pass
-                # svgpaths.append(
-                #     '<path d="%s" fill="%s"/>' % (p.asSVGPath(), col[ix % len(col)])
-                # )
+                svgpaths.append(
+                    '<path d="%s" fill="%s"/>' % (p.to_svg(), col[ix % len(col)])
+                )
         # for c in collisions:
         #     intersect = c.path1.intersection(c.path2)
         #     for i in intersect:
         #         svgpaths.append('<path d="%s" fill="black"/>' % (i.asSVGPath()))
         return '<svg %s viewBox="%i %i %i %i">%s</svg>\n' % (
             attribs,
-            0,
-            0,
-            0,
-            0,
+            bbox.min_x(),
+            bbox.min_y(),
+            bbox.width(),
+            bbox.height(),
             "\n".join(svgpaths),
         )
 
