@@ -1,4 +1,5 @@
 kurbopy>=0.8.32
+babelfont>=3.0.0
 uharfbuzz
 fonttools
 glyphtools
