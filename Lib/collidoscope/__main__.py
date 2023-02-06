@@ -1,6 +1,6 @@
 from collidoscope import Collidoscope
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType
-import sys
+from argparse import ArgumentParser, FileType
+import tqdm
 
 
 parser = ArgumentParser()
@@ -91,6 +91,7 @@ codepointfilter = []
 counter = 0
 
 def gen_texts(codepoints):
+    print("Generating text...")
     combinations = []
     texts = []
 
@@ -102,6 +103,7 @@ def gen_texts(codepoints):
     for element in itertools.product(*combinations):
         text = "".join(map(chr, element))
         texts.append(text)
+    print("Done")
     return texts
 
 if args.text:
@@ -116,15 +118,16 @@ elif args.range:
         else:
             codepointfilter.append(int(r,16))
     codepoints = list(filter(lambda x: x in codepointfilter, codepoints))
-    texts, count = gen_texts(codepoints)
+    texts = gen_texts(codepoints)
 else:
     print("Testing ALL GLYPHS AGAINST ALL GLYPHS - you may want to specify a -r range e.g. -r 0620-064A")
-    texts, count = gen_texts(codepoints)
+    texts = gen_texts(codepoints)
 
-for text in texts:
-    c.prep_shaper()
-    if counter % 100 == 0:
-        sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, len(texts), counter/len(texts)*100))
+c.prep_shaper()
+
+pbar = tqdm.tqdm(texts)
+for text in pbar:
+    pbar.set_description(text)
     glyphs = c.get_glyphs(text)
     cols = c.has_collisions(glyphs)
     if cols:

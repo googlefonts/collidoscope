@@ -3,3 +3,4 @@ babelfont>=3.0.0
 uharfbuzz
 fonttools
 skia-pathops
+tqdm
