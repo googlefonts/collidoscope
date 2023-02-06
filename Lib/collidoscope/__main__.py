@@ -82,17 +82,15 @@ padding: .5rem;
 <body>
 <h2>Collision Report</h2>
 <div class="cards">
-''' %  c.font.names.familyName.get_default())
+''' %  c.ttfont["name"].getDebugName(1))
 
-codepoints = c.font.unicode_map.keys()
+codepoints = c.ttfont.getBestCmap().keys()
 codepointfilter = []
 
 
-count = 1
 counter = 0
 
 def gen_texts(codepoints):
-    global count
     combinations = []
     texts = []
 
@@ -104,9 +102,8 @@ def gen_texts(codepoints):
     for element in itertools.product(*combinations):
         text = "".join(map(chr, element))
         texts.append(text)
-    return texts, count
+    return texts
 
-count = 0
 if args.text:
     texts = [args.text]
 elif args.file:
@@ -126,8 +123,8 @@ else:
 
 for text in texts:
     c.prep_shaper()
-    if counter % 1 == 0:
-        sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, count, counter/count*100))
+    if counter % 100 == 0:
+        sys.stderr.write("%s (%i/%i = %i%%)\n" % (text, counter, len(texts), counter/len(texts)*100))
     glyphs = c.get_glyphs(text)
     cols = c.has_collisions(glyphs)
     if cols:
