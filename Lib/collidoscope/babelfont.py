@@ -5,7 +5,13 @@ from kurbopy import BezPath
 
 class Collidoscope(BaseCollidoscope):
     def __init__(
-        self, fontfilename, rules, direction="LTR", master=None, scale_factor=1.0
+        self,
+        fontfilename,
+        rules,
+        direction="LTR",
+        master=None,
+        scale_factor=1.0,
+        babelfont=None,
     ):
         """Create a collision detector (using Babelfont)
 
@@ -47,6 +53,11 @@ class Collidoscope(BaseCollidoscope):
         self.rules = rules
         self.glyphcache = {}
         self.anchors = {}
+        if babelfont:
+            raise ValueError(
+                "Supplying a babelfont object is deprecated;"
+                " instead, use the collidoscope.babelfont module"
+            )
         if master:
             masters = [m for m in self.font.masters if m.name.get_default() == master]
             if not masters:
