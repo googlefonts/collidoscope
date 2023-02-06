@@ -1,12 +1,7 @@
 import uharfbuzz as hb
-import re
 from pathlib import Path
 from fontTools.ttLib import TTFont
-from glyphtools import categorize_glyph
-from babelfont import load
-from kurbopy import BezPath, Point, TranslateScale, Vec2, Rect
-import glyphtools
-import sys
+from kurbopy import BezPath, Point, TranslateScale, Vec2, BezPathCreatingPen
 from typing import NamedTuple
 
 
@@ -36,7 +31,7 @@ _KNOWN_RULES = ["faraway", "marks", "adjacent_clusters", "cursive", "area"]
 class Collidoscope:
     """Detect collisions between font glyphs"""
 
-    def __init__(self, fontfilename, rules, direction="LTR", babelfont=None, ttFont=None, master=None, scale_factor=1.0):
+    def __init__(self, fontfilename, rules, direction="LTR", location=None, scale_factor=1.0):
         """Create a collision detector.
 
         The rules dictionary may contain the following entries:
@@ -63,8 +58,9 @@ class Collidoscope:
         Args:
             fontfilename: file name of font.
             rules: dictionary of collision rules.
-            babelfont: babelfont object (loaded from file if not given).
             direction: "LTR" or "RTL"
+            location: for variable fonts, location in the designspace as a dictionary
+                (e.g. {"wght": 600})
             scale_factor: Outlines are scaled by this factor before comparison.
         """
         self.fontfilename = fontfilename
@@ -72,35 +68,30 @@ class Collidoscope:
         self.direction = direction
         self.fontbinary = None
         self.scale_factor = scale_factor
-        if babelfont:
-            self.font = babelfont
-            if not glyphtools.babelfont.isbabelfont(babelfont):
-                self.fontbinary = ttFont.reader.file.read()
-        else:
-            self.fontbinary = Path(fontfilename).read_bytes()
-            self.font = load(str(fontfilename))
-        if master:
-            masters = [m for m in self.font.masters if m.name.get_default() == master ]
-            if not masters:
-                raise ValueError("Could not find a master called %s" % master)
-            self.master = masters[0]
-        else:
-            self.master = self.font.default_master
+        self.fontbinary = Path(fontfilename).read_bytes()
+        self.ttfont = TTFont(fontfilename)
+        self.glyphorder = self.ttfont.getGlyphOrder()
+        self.location = location
         self.rules = rules
-        if self.fontbinary:
-            self.prep_shaper()
-        if "cursive" in self.rules and self.rules["cursive"]:
-            self.get_anchors()
-        else:
-            self.anchors = {}
-
         self.glyphcache = {}
+        self.prep_shaper()
+        self.get_cursive_anchors()
 
     def get_beziers(self, glyph):
-        glyphset = {k: self.master.get_glyph_layer(k) for k in self.font.glyphs.keys()}
-        layer = self.master.get_glyph_layer(glyph)
-        rv = BezPath.fromDrawable(layer, glyphset)
-        return rv
+        pen = BezPathCreatingPen()
+        self.hbfont.draw_glyph_with_pen(self.glyphorder.index(glyph), pen)
+        return pen.paths
+
+    def get_category(self, glyph):
+        if "GDEF" not in self.ttfont:
+            return "base"
+        table = self.ttfont["GDEF"].table
+        if not table.GlyphClassDef:
+            return "base"
+        category = table.GlyphClassDef.classDefs.get(glyph, 1)
+        if category == "3":
+            return "mark"
+        return "base"
 
     def get_rules(self):
         """Return all rules that are known.
@@ -139,6 +130,8 @@ class Collidoscope:
         upem = face.upem
         font.scale = (upem, upem)
         hb.ot_font_set_funcs(font)
+        if self.location:
+            font.set_variations(self.location)
         self.hbfont = font
 
     def shape_a_text(self, text):
@@ -149,17 +142,18 @@ class Collidoscope:
         self.direction = buf.direction
         return buf
 
-    def bb2path(bb):
-        vec = bb.tr - bb.bl
-        return Rectangle(vec.x, vec.y, origin=bb.bl + vec * 0.5)
-
-    def get_anchors(self):
+    def get_cursive_anchors(self):
+        if not("cursive" in self.rules and self.rules["cursive"]):
+            self.anchors = {}
+            return
         # Find the GPOS CursiveAttachment lookups
         cursives = filter(
             lambda x: x.LookupType == 3, self.font["GPOS"].table.LookupList.Lookup
         )
         anchors = {}
+
         for c in cursives:
+            # XXX This should be adjusted for variable fonts
             for s in c.SubTable:
                 for glyph, record in zip(s.Coverage.glyphs, s.EntryExitRecord):
                     anchors[glyph] = []
@@ -205,13 +199,13 @@ class Collidoscope:
         else:
             return {
                 "name": name,
-                "category": categorize_glyph(self.font, name)[0],
+                "category": self.get_category(name)[0],
                 "paths": []
             }
         self.glyphcache[name] = {
             "name": name,
             "paths": paths,
-            "category": categorize_glyph(self.font, name)[0],
+            "category": self.get_category(name)[0],
             "has_anchor": has_anchor,
             "bbox": bbox,
         }
@@ -256,15 +250,13 @@ class Collidoscope:
         This is the first step in collision detection; the dictionaries
         returned can be fed to ``draw_overlaps`` and ``has_collisions``."""
         if not buf:
-            if not self.fontbinary:
-                raise ValueError("When shaping text without providing a buffer, ttFont must be provided")
             buf = self.shape_a_text(text)
         cursor = 0
         glyphs = []
         ix = 0
         for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
             position = Point(cursor + pos.position[0], pos.position[1])
-            name = list(self.font.glyphs)[info.codepoint].name
+            name = self.glyphorder[info.codepoint]
             g = self.get_positioned_glyph(name, position)
             g["cluster"] = info.cluster
             glyphs.append(g)
