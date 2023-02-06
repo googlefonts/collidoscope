@@ -25,6 +25,19 @@ def _get_sequential_cluster_ids(glyphs):
     return scis
 
 
+def kurbo_to_skia(path):
+    import pathops
+
+    points = [(p.x, p.y) for p in path.flatten(1)]
+    skiapath = pathops.Path()
+    pen = skiapath.getPen()
+    pen.moveTo(points[0])
+    for pt in points[1:]:
+        pen.lineTo(pt)
+    pen.endPath()
+    return skiapath
+
+
 _KNOWN_RULES = ["faraway", "marks", "adjacent_clusters", "cursive", "area"]
 
 
@@ -360,13 +373,24 @@ class Collidoscope:
                 return False
 
         if self.rules.get("area"):
-            intersect = o.path1.intersection(o.path2, flat=True)
-            for i in intersect:
-                ia = i.area
-                # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, p1.area, p2.area))
+            # This is going to get tricky, since we now need boolean
+            # operations to work out the area of the intersection
+            skiapath1 = kurbo_to_skia(o.path1)
+            skiapath2 = kurbo_to_skia(o.path2)
+            area1 = abs(o.path1.area())
+            area2 = abs(o.path2.area())
+
+            import pathops
+
+            result = pathops.Path()
+            pathops.operations.intersection([skiapath1], [skiapath2], result.getPen())
+            intersections = BezPath.fromDrawable(result)
+            for i in intersections:
+                ia = abs(i.area())
+                # print("Intersection area: %i Path 1 area: %i Path 2 area: %i" % (ia, area1, area2))
                 if (
-                    ia > o.path1.area * self.rules["area"]
-                    or ia > o.path2.area * self.rules["area"]
+                    ia > area1 * self.rules["area"]
+                    or ia > area2 * self.rules["area"]
                 ):
                     return True
             return False
