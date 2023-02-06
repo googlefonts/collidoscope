@@ -1,5 +1,5 @@
 from . import Collidoscope as BaseCollidoscope
-from babelfont import load
+from babelfont import load, Font
 from kurbopy import BezPath
 
 
@@ -48,7 +48,10 @@ class Collidoscope(BaseCollidoscope):
         self.direction = direction
         self.fontbinary = None
         self.scale_factor = scale_factor
-        self.font = load(str(fontfilename))
+        if isinstance(fontfilename, Font):
+            self.font = fontfilename
+        else:
+            self.font = load(str(fontfilename))
         self.glyphorder = [g.name for g in self.font.glyphs]
         self.rules = rules
         self.glyphcache = {}
