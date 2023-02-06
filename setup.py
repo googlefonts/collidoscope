@@ -19,7 +19,7 @@ config = {
     'long_description': open('README.md', 'r').read(),
     'long_description_content_type': 'text/markdown',
     'license': 'MIT',
-    'version': '0.5.2',
+    'version': '0.6.0',
     'install_requires': install_requires,
     'classifiers': [
         "Programming Language :: Python",
