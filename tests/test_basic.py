@@ -1,4 +1,5 @@
 from collidoscope import Collidoscope
+from collidoscope.babelfont import Collidoscope as BabelfontCollidoscope
 from pathlib import Path
 from kurbopy import Point
 
@@ -39,10 +40,3 @@ def test_rules():
     c = Collidoscope(font, rules={"bases": True, "area": 0.5})
     glyphs = c.get_glyphs("ïï")
     assert not c.has_collisions(glyphs)
-
-
-# def test_glyphs():
-# 	font = DATADIR / "Nunito.glyphs"
-# 	c = Collidoscope(font, rules = { "bases": True} )
-# 	glyphs = [ c.get_positioned_glyph("a", Point(0, 0)), c.get_positioned_glyph("a", Point(100, 0)) ]
-# 	assert c.has_collisions(glyphs)
