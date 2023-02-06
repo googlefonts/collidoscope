@@ -212,13 +212,13 @@ class Collidoscope:
         else:
             return {
                 "name": name,
-                "category": self.get_category(name)[0],
+                "category": self.get_category(name),
                 "paths": []
             }
         self.glyphcache[name] = {
             "name": name,
             "paths": paths,
-            "category": self.get_category(name)[0],
+            "category": self.get_category(name),
             "has_anchor": has_anchor,
             "bbox": bbox,
         }
