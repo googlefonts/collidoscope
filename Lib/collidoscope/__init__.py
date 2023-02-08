@@ -102,7 +102,7 @@ class Collidoscope:
         if not table.GlyphClassDef:
             return "base"
         category = table.GlyphClassDef.classDefs.get(glyph, 1)
-        if category == "3":
+        if category == 3:
             return "mark"
         return "base"
 
