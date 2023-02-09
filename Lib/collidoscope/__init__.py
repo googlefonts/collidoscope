@@ -286,11 +286,14 @@ class Collidoscope:
             attribs: String of attributes added to SVG header.
         """
         svgpaths = []
-        bbox = glyphs[0]["bbox"]
+        bboxes = [ g["bbox"] for g in glyphs if "bbox" in g ]
+        if not bboxes:
+            return "<svg></svg>"
+        bbox = bboxes[0]
+        for newbox in bboxes[1:]:
+            bbox = bbox.union(newbox)
         col = ["green", "red", "purple", "blue", "yellow"]
         for ix, g in enumerate(glyphs):
-            if "bbox" in g:
-                bbox = bbox.union(g["bbox"])
             for p in g["paths"]:
                 svgpaths.append(
                     '<path d="%s" fill="%s"/>' % (p.to_svg(), col[ix % len(col)])
