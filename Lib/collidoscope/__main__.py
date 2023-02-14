@@ -1,6 +1,16 @@
 from collidoscope import Collidoscope
 from argparse import ArgumentParser, FileType
 import tqdm
+import re
+
+
+def designspace_location(loc):
+    if not loc:
+        return None
+    m = re.findall(r"(\w+)=([\.\d]+)[\s,]*", loc)
+    if not m:
+        raise ValueError(f"Cannot parse location '{loc}'")
+    return {axis: float(value) for axis, value in m}
 
 
 parser = ArgumentParser()
@@ -22,6 +32,8 @@ parser.add_argument('--area', type=int, default=0, dest="area",
                     help="check for interactions of size >=area%% between paths")
 parser.add_argument('--scale-factor', dest="scale_factor",
                     help="Scale glyphs before checking", metavar="SCALE", default=1.0)
+parser.add_argument('--location', dest="location",
+                    help="Designspace location", metavar="LOCATION", type=designspace_location)
 
 parser.add_argument('-r', dest="range",
                     help="Comma-separated list of Unicode ranges", metavar="RANGE")
@@ -50,7 +62,8 @@ c = Collidoscope(fontfilename, {
         "marks":   args.marks,
         "bases":   args.bases
     },
-    scale_factor = float(args.scale_factor)
+    scale_factor = float(args.scale_factor),
+    location = args.location
 )
 
 
