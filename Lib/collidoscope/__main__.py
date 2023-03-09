@@ -24,6 +24,8 @@ parser.add_argument('--no-marks', action='store_false', dest="marks",
                     help="don't check for interactions between marks")
 parser.add_argument('--no-bases', action='store_false', dest="bases",
                     help="don't check for interactions between bases")
+parser.add_argument('--no-bases-marks', action='store_false', dest="bases_marks",
+                    help="don't check for interactions between bases and marks")
 parser.add_argument('--no-adjacent-clusters', action='store_false', dest="adjacent_clusters",
                     help="don't check for interactions between glyphs in adjacent clusters")
 parser.add_argument('--cursive', action='store_true', dest="cursive",
@@ -60,7 +62,8 @@ c = Collidoscope(fontfilename, {
         "cursive": args.cursive,
         "area":    args.area / 100,
         "marks":   args.marks,
-        "bases":   args.bases
+        "bases":   args.bases,
+        "bases_marks": args.bases_marks,
     },
     scale_factor = float(args.scale_factor),
     location = args.location
