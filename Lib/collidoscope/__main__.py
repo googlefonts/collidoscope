@@ -122,7 +122,7 @@ def gen_texts(codepoints):
 if args.text:
     texts = [args.text]
 elif args.file:
-    texts = [ x.rtrim() for x in args.file.readlines()]
+    texts = [ x.rstrip() for x in args.file.readlines()]
 elif args.range:
     for r in args.range.split(","):
         if "-" in r:
